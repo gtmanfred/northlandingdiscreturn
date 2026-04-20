@@ -1,8 +1,11 @@
 # backend/tests/test_discs.py
+import uuid
 import pytest
 from datetime import date
+from unittest.mock import patch
 from app.repositories.disc import DiscRepository
 from app.repositories.user import UserRepository
+from app.services.auth import create_access_token
 
 
 async def test_create_disc(db):
@@ -103,3 +106,68 @@ async def test_list_by_phones(db):
     assert "E" in names
     assert "F" in names
     assert "G" not in names
+
+
+# --- Endpoint tests ---
+
+def admin_headers(user_id: uuid.UUID) -> dict:
+    return {"Authorization": f"Bearer {create_access_token(str(user_id))}"}
+
+
+async def make_admin(db, name="Admin", email="admin@example.com", google_id="g-admin"):
+    repo = UserRepository(db)
+    user = await repo.create(name=name, email=email, google_id=google_id)
+    user.is_admin = True
+    await db.commit()
+    return user
+
+
+async def test_create_disc_as_admin(client, db):
+    admin = await make_admin(db)
+    resp = await client.post(
+        "/discs",
+        json={"manufacturer": "Innova", "name": "Destroyer", "color": "Red",
+              "input_date": str(date.today()), "is_found": True},
+        headers=admin_headers(admin.id),
+    )
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Destroyer"
+
+
+async def test_create_disc_non_admin_forbidden(client, db):
+    repo = UserRepository(db)
+    user = await repo.create(name="Regular", email="reg@example.com", google_id="g-reg")
+    await db.commit()
+    resp = await client.post(
+        "/discs",
+        json={"manufacturer": "Innova", "name": "Boss", "color": "Blue",
+              "input_date": str(date.today())},
+        headers=admin_headers(user.id),
+    )
+    assert resp.status_code == 403
+
+
+async def test_list_discs_admin_sees_all(client, db):
+    admin = await make_admin(db, name="Admin2", email="admin2@example.com", google_id="g-admin2")
+    resp = await client.get("/discs", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    assert "items" in resp.json()
+
+
+async def test_upload_photo(client, db):
+    admin = await make_admin(db, name="Admin3", email="admin3@example.com", google_id="g-admin3")
+    create_resp = await client.post(
+        "/discs",
+        json={"manufacturer": "MVP", "name": "Atom", "color": "Gold",
+              "input_date": str(date.today())},
+        headers=admin_headers(admin.id),
+    )
+    disc_id = create_resp.json()["id"]
+
+    with patch("app.routers.discs.upload_photo", return_value=f"discs/{disc_id}/photo.jpg"):
+        resp = await client.post(
+            f"/discs/{disc_id}/photos",
+            files={"file": ("photo.jpg", b"fake-image-bytes", "image/jpeg")},
+            headers=admin_headers(admin.id),
+        )
+    assert resp.status_code == 201
