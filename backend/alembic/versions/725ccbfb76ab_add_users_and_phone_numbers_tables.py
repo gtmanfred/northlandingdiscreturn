@@ -1,7 +1,7 @@
-"""add users and phone_numbers tables
+"""initial schema
 
 Revision ID: 725ccbfb76ab
-Revises: 
+Revises:
 Create Date: 2026-04-20 14:57:58.419865
 
 """
