@@ -1,0 +1,30 @@
+[tests]
+min_version = 'v0.16.0'
+mount = false
+
+[tests.steps]
+tests = "uv run pytest {posargs}"
+
+[tests.environment]
+SECRET_KEY = "test-secret-key-for-tests-only"
+GOOGLE_CLIENT_ID = "test-client-id"
+GOOGLE_CLIENT_SECRET = "test-client-secret"
+TWILIO_ACCOUNT_SID = "ACtest"
+TWILIO_AUTH_TOKEN = "test-auth-token"
+TWILIO_FROM_NUMBER = "+15550000000"
+SUPABASE_URL = "https://test.supabase.co"
+SUPABASE_SERVICE_KEY = "test-service-key"
+
+[services.database]
+image = "docker.io/postgres:16"
+
+[services.database.ports]
+"5432/tcp" = ""
+
+[services.database.environment]
+POSTGRES_USER = "northlanding"
+POSTGRES_PASSWORD = "secret"
+POSTGRES_DB = "northlanding_test"
+
+[services.database.export]
+DATABASE_URL = "postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{HOST}:{PORT;5432/tcp}/{POSTGRES_DB}"
