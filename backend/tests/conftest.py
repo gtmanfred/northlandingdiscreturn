@@ -1,3 +1,4 @@
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -22,7 +23,9 @@ async def engine():
 async def db(engine):
     connection = await engine.connect()
     transaction = await connection.begin()
-    session_factory = async_sessionmaker(bind=connection, expire_on_commit=False)
+    session_factory = async_sessionmaker(
+        bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+    )
     session = session_factory()
     yield session
     await session.close()
