@@ -1,6 +1,9 @@
 # backend/tests/test_users.py
+import uuid
+from unittest.mock import patch
 import pytest
 from app.repositories.user import UserRepository
+from app.services.auth import create_access_token
 
 
 async def test_create_user(db):
@@ -102,3 +105,43 @@ async def test_list_all(db):
     emails = [u.email for u in users]
     assert "kim@example.com" in emails
     assert "lee@example.com" in emails
+
+
+def auth_headers(user_id: uuid.UUID) -> dict:
+    return {"Authorization": f"Bearer {create_access_token(str(user_id))}"}
+
+
+async def test_get_me(client, db):
+    repo = UserRepository(db)
+    user = await repo.create(name="Tester", email="tester@example.com", google_id="g-tester")
+    await db.commit()
+    response = await client.get("/users/me", headers=auth_headers(user.id))
+    assert response.status_code == 200
+    assert response.json()["email"] == "tester@example.com"
+
+
+async def test_add_phone_and_verify(client, db):
+    repo = UserRepository(db)
+    user = await repo.create(name="PhoneUser", email="phone@example.com", google_id="g-phone")
+    await db.commit()
+
+    with patch("app.routers.users.send_verification_sms") as mock_sms:
+        mock_sms.return_value = None
+        resp = await client.post(
+            "/users/me/phones",
+            json={"number": "+15551234567"},
+            headers=auth_headers(user.id),
+        )
+    assert resp.status_code == 200
+
+    phone = await repo.get_phone_by_number(user.id, "+15551234567")
+    assert phone is not None
+    code = phone.verification_code
+
+    resp2 = await client.post(
+        "/users/me/phones/verify",
+        json={"number": "+15551234567", "code": code},
+        headers=auth_headers(user.id),
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()["verified"] is True
