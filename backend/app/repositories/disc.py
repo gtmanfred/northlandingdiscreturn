@@ -80,7 +80,7 @@ class DiscRepository:
                 Disc.is_found == True,  # noqa: E712
                 Disc.is_returned == False,  # noqa: E712
                 Disc.phone_number.isnot(None),
-            )
+            ).options(selectinload(Disc.photos))
         )
         return list(result.scalars().all())
 
