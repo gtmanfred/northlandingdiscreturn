@@ -1,6 +1,6 @@
 from typing import Annotated
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -29,6 +29,7 @@ async def get_me(
 @router.post("/me/phones", response_model=PhoneNumberOut)
 async def add_phone(
     body: AddPhoneRequest,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -43,7 +44,7 @@ async def add_phone(
     code = generate_verification_code()
     await repo.set_verification_code(phone.id, code)
     await db.commit()
-    send_verification_sms(body.number, code)
+    background_tasks.add_task(send_verification_sms, body.number, code)
     await db.refresh(phone)
     return phone
 
@@ -58,10 +59,12 @@ async def verify_phone(
     phone = await repo.get_phone_by_number(current_user.id, body.number)
     if phone is None:
         raise HTTPException(status_code=404, detail="Phone number not found")
+    if phone.verified:
+        raise HTTPException(status_code=400, detail="Phone number already verified")
+    if not phone.verification_expires_at or phone.verification_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Verification code expired")
     if phone.verification_code != body.code:
         raise HTTPException(status_code=400, detail="Invalid verification code")
-    if phone.verification_expires_at and phone.verification_expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Verification code expired")
     phone = await repo.verify_phone(phone.id)
     await db.commit()
     return phone

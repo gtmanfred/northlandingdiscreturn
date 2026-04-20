@@ -17,7 +17,9 @@ async def get_current_user(
 ) -> User:
     try:
         payload = decode_access_token(credentials.credentials)
-        user_id: str = payload.get("sub")
+        user_id: str | None = payload.get("sub")
+        if not user_id:
+            raise JWTError("Missing sub claim")
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     repo = UserRepository(db)

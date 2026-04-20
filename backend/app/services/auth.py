@@ -1,4 +1,4 @@
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 from twilio.rest import Client
@@ -16,7 +16,7 @@ def decode_access_token(token: str) -> dict:
 
 
 def generate_verification_code() -> str:
-    return str(random.randint(100000, 999999))
+    return str(secrets.randbelow(900000) + 100000)
 
 
 def send_verification_sms(to_number: str, code: str) -> None:
