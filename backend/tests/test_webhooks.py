@@ -2,7 +2,6 @@
 import hmac
 import hashlib
 import base64
-from unittest.mock import patch
 from app.config import settings
 
 
@@ -18,12 +17,11 @@ async def test_twilio_webhook_valid_signature(client):
     params = {"Body": "STOP", "From": "+15551234567"}
     url = "http://test/webhooks/twilio"
     sig = make_twilio_signature(url, params, settings.TWILIO_AUTH_TOKEN)
-    with patch("app.routers.webhooks.validate_twilio_signature", return_value=True):
-        resp = await client.post(
-            "/webhooks/twilio",
-            data=params,
-            headers={"X-Twilio-Signature": sig},
-        )
+    resp = await client.post(
+        "/webhooks/twilio",
+        data=params,
+        headers={"X-Twilio-Signature": sig},
+    )
     assert resp.status_code == 200
 
 

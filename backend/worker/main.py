@@ -1,5 +1,6 @@
 # backend/worker/main.py
 import asyncio
+import functools
 import logging
 from twilio.rest import Client
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -25,13 +26,16 @@ async def process_sms_jobs(db: AsyncSession | None = None) -> None:
             return
         logger.info(f"Processing {len(jobs)} SMS jobs")
         twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        loop = asyncio.get_event_loop()
         for job in jobs:
             try:
-                twilio_client.messages.create(
+                send_fn = functools.partial(
+                    twilio_client.messages.create,
                     body=job.message,
                     from_=settings.TWILIO_FROM_NUMBER,
                     to=job.phone_number,
                 )
+                await loop.run_in_executor(None, send_fn)
                 await repo.mark_sms_sent(job)
                 logger.info(f"SMS sent to {job.phone_number}")
             except Exception as e:
