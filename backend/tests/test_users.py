@@ -2,7 +2,9 @@
 import uuid
 from unittest.mock import patch
 import pytest
+from datetime import date
 from app.repositories.user import UserRepository
+from app.repositories.disc import DiscRepository
 from app.services.auth import create_access_token
 
 
@@ -145,3 +147,37 @@ async def test_add_phone_and_verify(client, db):
     )
     assert resp2.status_code == 200
     assert resp2.json()["verified"] is True
+
+
+async def test_get_my_wishlist(client, db):
+    repo = UserRepository(db)
+    user = await repo.create(name="Wish", email="wish@test.com", google_id="g-wish")
+    phone = await repo.add_phone_number(user.id, "+15550001234")
+    await repo.verify_phone(phone.id)
+    await db.commit()
+
+    disc_repo = DiscRepository(db)
+    await disc_repo.create(
+        manufacturer="Innova", name="Teebird", color="Pink",
+        input_date=date.today(), phone_number="+15550001234", is_found=False
+    )
+    await db.commit()
+
+    resp = await client.get("/users/me/wishlist", headers=auth_headers(user.id))
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+    assert resp.json()[0]["name"] == "Teebird"
+
+
+async def test_add_wishlist_disc(client, db):
+    repo = UserRepository(db)
+    user = await repo.create(name="WishAdd", email="wishadd@test.com", google_id="g-wishadd")
+    await db.commit()
+
+    resp = await client.post(
+        "/users/me/wishlist",
+        json={"manufacturer": "Discraft", "name": "Buzzz", "color": "White"},
+        headers=auth_headers(user.id),
+    )
+    assert resp.status_code == 201
+    assert resp.json()["is_found"] is False

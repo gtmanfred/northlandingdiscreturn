@@ -73,6 +73,15 @@ class DiscRepository:
         )
         return list(result.scalars().all())
 
+    async def list_wishlist_by_phones(self, phone_numbers: list[str]) -> list[Disc]:
+        result = await self.db.execute(
+            select(Disc)
+            .where(Disc.phone_number.in_(phone_numbers), Disc.is_found == False)  # noqa: E712
+            .options(selectinload(Disc.photos))
+            .order_by(Disc.created_at.desc())
+        )
+        return list(result.scalars().all())
+
     async def count_all(self) -> int:
         result = await self.db.execute(
             select(func.count()).select_from(Disc)

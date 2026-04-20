@@ -1,5 +1,6 @@
+import uuid
 from typing import Annotated
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -8,7 +9,9 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User, PhoneNumber
 from app.repositories.user import UserRepository
+from app.repositories.disc import DiscRepository
 from app.schemas.user import UserOut, PhoneNumberOut, AddPhoneRequest, VerifyPhoneRequest
+from app.schemas.disc import DiscOut, WishlistDiscCreate
 from app.services.auth import generate_verification_code, send_verification_sms
 
 router = APIRouter()
@@ -81,4 +84,57 @@ async def remove_phone(
     if phone is None:
         raise HTTPException(status_code=404, detail="Phone number not found")
     await repo.delete_phone(phone.id)
+    await db.commit()
+
+
+@router.get("/me/wishlist", response_model=list[DiscOut])
+async def get_my_wishlist(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    user_repo = UserRepository(db)
+    phones = await user_repo.get_verified_numbers(current_user.id)
+    numbers = [p.number for p in phones]
+    if not numbers:
+        return []
+    disc_repo = DiscRepository(db)
+    return await disc_repo.list_wishlist_by_phones(numbers)
+
+
+@router.post("/me/wishlist", response_model=DiscOut, status_code=201)
+async def add_wishlist_disc(
+    body: WishlistDiscCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    user_repo = UserRepository(db)
+    phones = await user_repo.get_verified_numbers(current_user.id)
+    phone_number = phones[0].number if phones else None
+    disc_repo = DiscRepository(db)
+    disc = await disc_repo.create(
+        manufacturer=body.manufacturer or "Unknown",
+        name=body.name or "Unknown",
+        color=body.color or "Unknown",
+        input_date=date.today(),
+        phone_number=phone_number,
+        is_found=False,
+    )
+    await db.commit()
+    return await disc_repo.get_by_id(disc.id)
+
+
+@router.delete("/me/wishlist/{disc_id}", status_code=204)
+async def remove_wishlist_disc(
+    disc_id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    user_repo = UserRepository(db)
+    phones = await user_repo.get_verified_numbers(current_user.id)
+    numbers = [p.number for p in phones]
+    disc_repo = DiscRepository(db)
+    disc = await disc_repo.get_by_id(disc_id)
+    if disc is None or disc.is_found or disc.phone_number not in numbers:
+        raise HTTPException(status_code=404, detail="Wishlist disc not found")
+    await disc_repo.delete(disc_id)
     await db.commit()

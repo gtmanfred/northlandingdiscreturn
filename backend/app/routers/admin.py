@@ -59,8 +59,7 @@ async def get_user_wishlist(
         return []
     disc_repo = DiscRepository(db)
     numbers = [p.number for p in phones]
-    all_discs = await disc_repo.list_by_phones(numbers)
-    return [d for d in all_discs if not d.is_found]
+    return await disc_repo.list_wishlist_by_phones(numbers)
 
 
 @router.post("/users/{user_id}/wishlist", response_model=DiscOut, status_code=201)
