@@ -82,6 +82,7 @@ class PickupEventRepository:
         result = await self.db.execute(
             select(SMSJob)
             .where(SMSJob.status == SMSJobStatus.pending)
+            .order_by(SMSJob.created_at)
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
