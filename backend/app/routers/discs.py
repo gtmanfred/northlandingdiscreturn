@@ -1,4 +1,5 @@
 # backend/app/routers/discs.py
+import asyncio
 import uuid
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -24,13 +25,13 @@ async def list_discs(
     repo = DiscRepository(db)
     if current_user.is_admin:
         discs = await repo.list_all(page=page, page_size=page_size)
-        total = len(discs)
+        total = await repo.count_all()
     else:
         user_repo = UserRepository(db)
         phones = await user_repo.get_verified_numbers(current_user.id)
         numbers = [p.number for p in phones]
         discs = await repo.list_by_phones(numbers)
-        total = len(discs)
+        total = await repo.count_by_phones(numbers)
     return DiscPage(
         items=[DiscOut.model_validate(d) for d in discs],
         page=page,
@@ -64,6 +65,8 @@ async def update_disc(
     if disc is None:
         raise HTTPException(status_code=404, detail="Disc not found")
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=422, detail="No fields provided for update")
     await repo.update(disc, **updates)
     await db.commit()
     disc = await repo.get_by_id(disc_id)
@@ -100,7 +103,7 @@ async def upload_disc_photo(
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
     path = f"discs/{disc_id}/{uuid.uuid4()}.{ext}"
     sort_order = len(disc.photos)
-    upload_photo(file_bytes, path, file.content_type or "image/jpeg")
+    await asyncio.to_thread(upload_photo, file_bytes, path, file.content_type or "image/jpeg")
     photo = await repo.add_photo(disc_id, path, sort_order)
     await db.commit()
     return photo
@@ -117,5 +120,5 @@ async def delete_disc_photo(
     path = await repo.delete_photo(photo_id)
     if path is None:
         raise HTTPException(status_code=404, detail="Photo not found")
-    delete_photo(path)
+    await asyncio.to_thread(delete_photo, path)
     await db.commit()

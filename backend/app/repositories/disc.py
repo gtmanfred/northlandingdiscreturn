@@ -1,7 +1,7 @@
 # backend/app/repositories/disc.py
 import uuid
 from datetime import date
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.disc import Disc, DiscPhoto
@@ -72,6 +72,21 @@ class DiscRepository:
             .order_by(Disc.created_at.desc())
         )
         return list(result.scalars().all())
+
+    async def count_all(self) -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(Disc)
+        )
+        return result.scalar_one()
+
+    async def count_by_phones(self, phone_numbers: list[str]) -> int:
+        result = await self.db.execute(
+            select(func.count()).select_from(Disc).where(
+                Disc.phone_number.in_(phone_numbers),
+                Disc.is_found == True,  # noqa: E712
+            )
+        )
+        return result.scalar_one()
 
     async def list_unreturned_found(self) -> list[Disc]:
         """All found, unreturned discs with a phone number — for pickup notifications."""
