@@ -2,6 +2,7 @@
 import uuid
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User, PhoneNumber
 
@@ -87,5 +88,7 @@ class UserRepository:
         await self.db.flush()
 
     async def list_all(self) -> list[User]:
-        result = await self.db.execute(select(User).order_by(User.created_at))
+        result = await self.db.execute(
+            select(User).options(selectinload(User.phone_numbers)).order_by(User.created_at)
+        )
         return list(result.scalars().all())
