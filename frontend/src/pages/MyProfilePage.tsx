@@ -79,17 +79,24 @@ export function MyProfilePage() {
 
       <h2 className="text-lg font-semibold mb-3">Linked Phone Numbers</h2>
 
-      {user?.phone_numbers?.map((p) => (
-        <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span>{p.number} {p.verified ? '✓' : <span className="text-yellow-600 text-xs">(unverified)</span>}</span>
-          <button
-            onClick={() => handleRemove(p.number)}
-            className="text-red-500 text-sm hover:text-red-700"
-          >
-            Remove
-          </button>
-        </div>
-      ))}
+      <div className="space-y-2 mb-2">
+        {user?.phone_numbers?.map((p) => (
+          <div key={p.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
+            <div>
+              <p className="font-medium text-sm">{p.number}</p>
+              {p.verified
+                ? <p className="text-xs text-green-600">Verified</p>
+                : <p className="text-xs text-yellow-600">Unverified</p>}
+            </div>
+            <button
+              onClick={() => handleRemove(p.number)}
+              className="text-red-500 text-sm hover:text-red-700"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
 
       <div className="mt-6">
         {step === 'idle' ? (
