@@ -4,8 +4,10 @@ import {
   useGetMyWishlist,
   useAddWishlistDisc,
   useRemoveWishlistDisc,
+  useGetSuggestions,
   getGetMyWishlistQueryKey,
 } from '../api/northlanding'
+import { AutocompleteInput } from '../components/AutocompleteInput'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function MyWishlistPage() {
@@ -13,6 +15,9 @@ export function MyWishlistPage() {
   const { data: discs, isLoading } = useGetMyWishlist()
   const addMutation = useAddWishlistDisc()
   const removeMutation = useRemoveWishlistDisc()
+  const { data: manufacturerSuggestions = [] } = useGetSuggestions({ field: 'manufacturer' })
+  const { data: nameSuggestions = [] } = useGetSuggestions({ field: 'name' })
+  const { data: colorSuggestions = [] } = useGetSuggestions({ field: 'color' })
   const [form, setForm] = useState({ manufacturer: '', name: '', color: '' })
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -37,23 +42,26 @@ export function MyWishlistPage() {
       </p>
 
       <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-lg p-4 mb-8 flex gap-3 flex-wrap">
-        <input
+        <AutocompleteInput
           className="border border-gray-300 rounded px-3 py-2 flex-1 min-w-32"
           placeholder="Manufacturer"
           value={form.manufacturer}
-          onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))}
+          suggestions={manufacturerSuggestions.map((v) => ({ value: v }))}
+          onValueChange={(v) => setForm((f) => ({ ...f, manufacturer: v }))}
         />
-        <input
+        <AutocompleteInput
           className="border border-gray-300 rounded px-3 py-2 flex-1 min-w-32"
           placeholder="Disc name"
           value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          suggestions={nameSuggestions.map((v) => ({ value: v }))}
+          onValueChange={(v) => setForm((f) => ({ ...f, name: v }))}
         />
-        <input
+        <AutocompleteInput
           className="border border-gray-300 rounded px-3 py-2 flex-1 min-w-24"
           placeholder="Color"
           value={form.color}
-          onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+          suggestions={colorSuggestions.map((v) => ({ value: v }))}
+          onValueChange={(v) => setForm((f) => ({ ...f, color: v }))}
         />
         <button
           type="submit"
