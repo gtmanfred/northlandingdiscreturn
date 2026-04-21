@@ -16,7 +16,7 @@ export function MyDiscsPage() {
         <div className="space-y-4">
           {discs.map((disc) => (
             <div key={disc.id} className="bg-white rounded-lg border border-gray-200 p-4 flex gap-4 items-start">
-              {disc.photos[0] && (
+              {disc.photos?.[0] && (
                 <img
                   src={disc.photos[0].photo_path}
                   alt={disc.name}
