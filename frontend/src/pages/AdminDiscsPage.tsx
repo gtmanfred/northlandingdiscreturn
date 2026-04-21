@@ -53,7 +53,7 @@ export function AdminDiscsPage() {
     setError('')
     try {
       await deleteMutation.mutateAsync({ discId })
-      queryClient.invalidateQueries({ queryKey: ['/discs'] })
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
     } catch {
       setError(`Failed to delete ${name}.`)
     }
@@ -62,7 +62,7 @@ export function AdminDiscsPage() {
   const handleToggleIsFound = async (discId: string, current: boolean) => {
     try {
       await updateMutation.mutateAsync({ discId, data: { is_found: !current } })
-      queryClient.invalidateQueries({ queryKey: ['/discs'] })
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
     } catch {
       setError('Failed to update disc.')
     }
@@ -71,7 +71,7 @@ export function AdminDiscsPage() {
   const handleToggleIsReturned = async (discId: string, current: boolean) => {
     try {
       await updateMutation.mutateAsync({ discId, data: { is_returned: !current } })
-      queryClient.invalidateQueries({ queryKey: ['/discs'] })
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
     } catch {
       setError('Failed to update disc.')
     }
@@ -136,8 +136,9 @@ export function AdminDiscsPage() {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Name / manufacturer</label>
+          <label htmlFor="filter-search" className="block text-xs text-gray-500 mb-1">Name / manufacturer</label>
           <input
+            id="filter-search"
             type="search"
             placeholder="Filter by name, manufacturer…"
             value={search}
@@ -206,7 +207,7 @@ export function AdminDiscsPage() {
                       type="checkbox"
                       checked={disc.is_returned}
                       onChange={() => handleToggleIsReturned(disc.id, disc.is_returned)}
-                      title={disc.is_returned ? 'Mark as not returned' : 'Mark as returned'}
+                      aria-label={disc.is_returned ? 'Mark as not returned' : 'Mark as returned'}
                       className="cursor-pointer"
                     />
                   </td>
