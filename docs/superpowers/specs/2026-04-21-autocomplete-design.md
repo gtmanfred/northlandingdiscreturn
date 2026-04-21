@@ -41,7 +41,7 @@ Returns a sorted, case-insensitively deduplicated list of distinct string values
 ["Discraft", "Innova", "Latitude 64"]
 ```
 
-**Auth:** Requires authentication. Disc names and colors are innocuous, but `owner_name` values are people's names and should not be publicly enumerable.
+**Auth:** `manufacturer`, `name`, `color` — requires authentication. `owner_name` — admin only; owner names should not be enumerable by non-admins.
 
 #### `GET /api/suggestions/phone?owner_name={name}`
 
