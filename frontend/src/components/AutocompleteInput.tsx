@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 export interface Suggestion {
   value: string
@@ -20,12 +20,13 @@ export function AutocompleteInput({
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
-  const listId = useRef(`ac-${Math.random().toString(36).slice(2)}`)
+  const listId = useId()
 
   const inputStr = String(value)
   const filtered = suggestions.filter((s) =>
-    (s.label ?? s.value).toLowerCase().includes(inputStr.toLowerCase()),
+    s.value.toLowerCase().includes(inputStr.toLowerCase()),
   )
+  const safeActiveIndex = activeIndex >= filtered.length ? filtered.length - 1 : activeIndex
   const isOpen = open && filtered.length > 0
 
   useEffect(() => {
@@ -53,9 +54,9 @@ export function AutocompleteInput({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setActiveIndex((i) => Math.max(i - 1, 0))
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
+    } else if (e.key === 'Enter' && safeActiveIndex >= 0) {
       e.preventDefault()
-      select(filtered[activeIndex])
+      select(filtered[safeActiveIndex])
     } else if (e.key === 'Escape') {
       setOpen(false)
       setActiveIndex(-1)
@@ -76,26 +77,26 @@ export function AutocompleteInput({
         onKeyDown={handleKeyDown}
         role="combobox"
         aria-expanded={isOpen}
-        aria-controls={listId.current}
-        aria-activedescendant={activeIndex >= 0 ? `${listId.current}-${activeIndex}` : undefined}
+        aria-controls={listId}
+        aria-activedescendant={safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
         autoComplete="off"
         className={className ?? 'w-full border border-gray-300 rounded px-3 py-2'}
       />
       {isOpen && (
         <ul
-          id={listId.current}
+          id={listId}
           role="listbox"
           className="absolute z-10 w-full bg-white border border-gray-300 rounded shadow-md mt-1 max-h-48 overflow-y-auto"
         >
           {filtered.map((s, i) => (
             <li
               key={s.value}
-              id={`${listId.current}-${i}`}
+              id={`${listId}-${i}`}
               role="option"
-              aria-selected={i === activeIndex}
+              aria-selected={i === safeActiveIndex}
               onMouseDown={() => select(s)}
               className={`px-3 py-2 cursor-pointer text-sm ${
-                i === activeIndex ? 'bg-green-50 text-green-800' : 'hover:bg-gray-50'
+                i === safeActiveIndex ? 'bg-green-50 text-green-800' : 'hover:bg-gray-50'
               }`}
             >
               {s.label ?? s.value}

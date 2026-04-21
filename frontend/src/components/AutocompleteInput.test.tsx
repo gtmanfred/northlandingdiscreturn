@@ -76,7 +76,26 @@ it('selects suggestion with Enter after arrow navigation', async () => {
   await user.click(input)
   await user.keyboard('{ArrowDown}')
   await user.keyboard('{Enter}')
-  expect(onValueChange).toHaveBeenCalled()
+  expect(onValueChange).toHaveBeenCalledWith('Innova')
+})
+
+it('filters by value not label for labeled suggestions', async () => {
+  const user = userEvent.setup()
+  const onValueChange = vi.fn()
+  render(
+    <AutocompleteInput
+      suggestions={[
+        { value: '+15551234567', label: '+15551234567 — Alice (alice@example.com)' },
+        { value: '+15559876543', label: '+15559876543 — Bob (bob@example.com)' },
+      ]}
+      onValueChange={onValueChange}
+      value="+15551"
+    />
+  )
+  const input = screen.getByRole('combobox')
+  await user.click(input)
+  expect(screen.getByText('+15551234567 — Alice (alice@example.com)')).toBeInTheDocument()
+  expect(screen.queryByText('+15559876543 — Bob (bob@example.com)')).not.toBeInTheDocument()
 })
 
 it('closes dropdown on Escape', async () => {
