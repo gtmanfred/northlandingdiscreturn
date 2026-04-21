@@ -138,3 +138,22 @@ async def test_phone_suggestions_deduplicates_registered_wins(db, client):
 async def test_phone_suggestions_requires_auth(client):
     resp = await client.get("/suggestions/phone?owner_name=Alice")
     assert resp.status_code == 401
+
+
+async def test_phone_suggestions_empty_owner_name_rejected(db, client):
+    admin = await make_user(db, is_admin=True)
+    resp = await client.get("/suggestions/phone?owner_name=", headers=auth_headers(admin.id))
+    assert resp.status_code == 422
+
+
+async def test_phone_suggestions_case_insensitive(db, client):
+    admin = await make_user(db, is_admin=True)
+    user_repo = UserRepository(db)
+    owner = await user_repo.create(name="Alice Smith", email="alice.smith@example.com", google_id="google-alice-ci")
+    phone = await user_repo.add_phone_number(owner.id, "+15556667777")
+    await user_repo.verify_phone(phone.id)
+
+    resp = await client.get("/suggestions/phone?owner_name=alice+smith", headers=auth_headers(admin.id))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert any(s["number"] == "+15556667777" for s in data)
