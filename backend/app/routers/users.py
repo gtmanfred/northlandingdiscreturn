@@ -112,7 +112,7 @@ async def get_my_discs(
     if not numbers:
         return []
     disc_repo = DiscRepository(db)
-    return await disc_repo.list_wishlist_by_phones(numbers)
+    return await disc_repo.list_found_by_phones(numbers)
 
 
 @router.post("/me/wishlist", response_model=DiscOut, status_code=201, operation_id="addWishlistDisc")
