@@ -44,15 +44,30 @@ class DiscRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_all(self, *, page: int = 1, page_size: int = 50) -> list[Disc]:
+    async def list_all(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        is_found: bool | None = None,
+        is_returned: bool | None = None,
+        owner_name: str | None = None,
+    ) -> list[Disc]:
         offset = (page - 1) * page_size
-        result = await self.db.execute(
+        stmt = (
             select(Disc)
             .options(selectinload(Disc.photos))
             .order_by(Disc.created_at.desc())
             .offset(offset)
             .limit(page_size)
         )
+        if is_found is not None:
+            stmt = stmt.where(Disc.is_found == is_found)
+        if is_returned is not None:
+            stmt = stmt.where(Disc.is_returned == is_returned)
+        if owner_name is not None:
+            stmt = stmt.where(Disc.owner_name.ilike(f"%{owner_name}%"))
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     async def list_by_phone(self, phone_number: str) -> list[Disc]:
@@ -82,10 +97,21 @@ class DiscRepository:
         )
         return list(result.scalars().all())
 
-    async def count_all(self) -> int:
-        result = await self.db.execute(
-            select(func.count()).select_from(Disc)
-        )
+    async def count_all(
+        self,
+        *,
+        is_found: bool | None = None,
+        is_returned: bool | None = None,
+        owner_name: str | None = None,
+    ) -> int:
+        stmt = select(func.count()).select_from(Disc)
+        if is_found is not None:
+            stmt = stmt.where(Disc.is_found == is_found)
+        if is_returned is not None:
+            stmt = stmt.where(Disc.is_returned == is_returned)
+        if owner_name is not None:
+            stmt = stmt.where(Disc.owner_name.ilike(f"%{owner_name}%"))
+        result = await self.db.execute(stmt)
         return result.scalar_one()
 
     async def count_by_phones(self, phone_numbers: list[str]) -> int:
