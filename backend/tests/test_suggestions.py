@@ -67,3 +67,69 @@ async def test_suggestions_owner_name_admin_succeeds(db, client):
     resp = await client.get("/suggestions?field=owner_name", headers=auth_headers(admin.id))
     assert resp.status_code == 200
     assert resp.json() == ["Alice", "Bob"]
+
+
+async def test_phone_suggestions_requires_admin(db, client):
+    user = await make_user(db, is_admin=False)
+    resp = await client.get("/suggestions/phone?owner_name=Alice", headers=auth_headers(user.id))
+    assert resp.status_code == 403
+
+
+async def test_phone_suggestions_from_disc_records(db, client):
+    admin = await make_user(db, is_admin=True)
+    disc_repo = DiscRepository(db)
+    await disc_repo.create(
+        manufacturer="Innova", name="Boss", color="Blue",
+        input_date=date.today(), owner_name="Alice", phone_number="+15551112222"
+    )
+    await disc_repo.create(
+        manufacturer="Discraft", name="Buzzz", color="Red",
+        input_date=date.today(), owner_name="Alice", phone_number="+15553334444"
+    )
+    await disc_repo.create(
+        manufacturer="MVP", name="Atom", color="Green",
+        input_date=date.today(), owner_name="Bob", phone_number="+15559998888"
+    )
+
+    resp = await client.get("/suggestions/phone?owner_name=Alice", headers=auth_headers(admin.id))
+    assert resp.status_code == 200
+    data = resp.json()
+    numbers = [s["number"] for s in data]
+    assert "+15551112222" in numbers
+    assert "+15553334444" in numbers
+    assert "+15559998888" not in numbers
+
+
+async def test_phone_suggestions_from_registered_users(db, client):
+    admin = await make_user(db, is_admin=True)
+    user_repo = UserRepository(db)
+    owner = await user_repo.create(name="Alice", email="alice@example.com", google_id="google-alice-99")
+    phone = await user_repo.add_phone_number(owner.id, "+15550001111")
+    await user_repo.verify_phone(phone.id)
+
+    resp = await client.get("/suggestions/phone?owner_name=Alice", headers=auth_headers(admin.id))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert any(s["number"] == "+15550001111" and "alice@example.com" in s["label"] for s in data)
+
+
+async def test_phone_suggestions_deduplicates_registered_wins(db, client):
+    admin = await make_user(db, is_admin=True)
+    user_repo = UserRepository(db)
+    disc_repo = DiscRepository(db)
+
+    owner = await user_repo.create(name="Alice", email="alice@example.com", google_id="google-alice-dedup")
+    phone = await user_repo.add_phone_number(owner.id, "+15550001111")
+    await user_repo.verify_phone(phone.id)
+
+    await disc_repo.create(
+        manufacturer="Innova", name="Boss", color="Blue",
+        input_date=date.today(), owner_name="Alice", phone_number="+15550001111"
+    )
+
+    resp = await client.get("/suggestions/phone?owner_name=Alice", headers=auth_headers(admin.id))
+    assert resp.status_code == 200
+    data = resp.json()
+    matching = [s for s in data if s["number"] == "+15550001111"]
+    assert len(matching) == 1
+    assert "alice@example.com" in matching[0]["label"]

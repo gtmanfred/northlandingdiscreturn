@@ -1,11 +1,12 @@
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_admin
 from app.models.disc import Disc
-from app.models.user import User
+from app.models.user import PhoneNumber, User
 
 router = APIRouter()
 
@@ -31,3 +32,43 @@ async def get_suggestions(
         select(subq.c.val).order_by(func.lower(subq.c.val))
     )
     return [row[0] for row in result.all()]
+
+
+class PhoneSuggestion(BaseModel):
+    number: str
+    label: str
+
+
+@router.get("/phone", response_model=list[PhoneSuggestion], operation_id="getPhoneSuggestions")
+async def get_phone_suggestions(
+    owner_name: Annotated[str, Query()],
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[PhoneSuggestion]:
+    # Verified numbers from registered users matching owner_name
+    result1 = await db.execute(
+        select(PhoneNumber.number, User.name, User.email)
+        .join(User, PhoneNumber.user_id == User.id)
+        .where(func.lower(User.name) == func.lower(owner_name))
+        .where(PhoneNumber.verified.is_(True))
+    )
+    registered: dict[str, PhoneSuggestion] = {
+        row.number: PhoneSuggestion(
+            number=row.number,
+            label=f"{row.number} — {row.name} ({row.email})",
+        )
+        for row in result1.all()
+    }
+
+    # Phone numbers from past disc records for this owner
+    result2 = await db.execute(
+        select(distinct(Disc.phone_number))
+        .where(func.lower(Disc.owner_name) == func.lower(owner_name))
+        .where(Disc.phone_number.is_not(None))
+        .where(Disc.phone_number != "")
+    )
+    for (number,) in result2.all():
+        if number not in registered:
+            registered[number] = PhoneSuggestion(number=number, label=number)
+
+    return list(registered.values())
