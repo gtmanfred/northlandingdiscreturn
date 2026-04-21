@@ -1,3 +1,7 @@
+from unittest.mock import patch
+
+from app.repositories.user import UserRepository
+from app.routers.auth import _maybe_promote_to_admin
 from app.services.auth import create_access_token, decode_access_token
 
 
@@ -15,3 +19,34 @@ async def test_get_current_user_invalid_token(client):
 async def test_get_current_user_no_token(client):
     response = await client.get("/users/me")
     assert response.status_code in (401, 403)  # HTTPBearer returns 403 or 401 when no credentials
+
+
+async def test_maybe_promote_to_admin_promotes_seed_email(db):
+    repo = UserRepository(db)
+    user = await repo.create(name="Alice", email="alice@test.com", google_id="g-alice")
+    with patch("app.routers.auth.settings") as mock_settings:
+        mock_settings.ADMIN_EMAILS = ["alice@test.com"]
+        await _maybe_promote_to_admin(user, "alice@test.com", repo, db)
+    await db.refresh(user)
+    assert user.is_admin is True
+
+
+async def test_maybe_promote_to_admin_skips_non_seed_email(db):
+    repo = UserRepository(db)
+    user = await repo.create(name="Bob", email="bob@test.com", google_id="g-bob")
+    with patch("app.routers.auth.settings") as mock_settings:
+        mock_settings.ADMIN_EMAILS = ["seed@test.com"]
+        await _maybe_promote_to_admin(user, "bob@test.com", repo, db)
+    await db.refresh(user)
+    assert user.is_admin is False
+
+
+async def test_maybe_promote_to_admin_skips_already_admin(db):
+    repo = UserRepository(db)
+    user = await repo.create(name="Alice", email="alice@test.com", google_id="g-alice2")
+    user.is_admin = True
+    await db.flush()
+    with patch("app.routers.auth.settings") as mock_settings:
+        mock_settings.ADMIN_EMAILS = ["alice@test.com"]
+        await _maybe_promote_to_admin(user, "alice@test.com", repo, db)
+    assert user.is_admin is True
