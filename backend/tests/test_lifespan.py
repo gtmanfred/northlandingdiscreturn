@@ -54,3 +54,40 @@ async def test_get_by_emails_returns_empty_for_empty_list(db):
     repo = UserRepository(db)
     result = await repo.get_by_emails([])
     assert result == []
+
+
+from app.main import _promote_seed_admins
+
+
+async def test_promote_seed_admins_promotes_matching_user(db, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", "alice@test.com")
+    repo = UserRepository(db)
+    user = await repo.create(name="Alice", email="alice@test.com", google_id="g-alice")
+    await _promote_seed_admins(db)
+    await db.refresh(user)
+    assert user.is_admin is True
+
+
+async def test_promote_seed_admins_skips_already_admin(db, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", "alice@test.com")
+    repo = UserRepository(db)
+    user = await repo.create(name="Alice", email="alice@test.com", google_id="g-alice2")
+    user.is_admin = True
+    await db.flush()
+    await _promote_seed_admins(db)
+    await db.refresh(user)
+    assert user.is_admin is True
+
+
+async def test_promote_seed_admins_skips_when_env_empty(db, monkeypatch):
+    monkeypatch.delenv("ADMIN_EMAILS", raising=False)
+    repo = UserRepository(db)
+    user = await repo.create(name="Bob", email="bob@test.com", google_id="g-bob")
+    await _promote_seed_admins(db)
+    await db.refresh(user)
+    assert user.is_admin is False
+
+
+async def test_promote_seed_admins_skips_nonexistent_email(db, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", "ghost@test.com")
+    await _promote_seed_admins(db)  # must not raise

@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
+from app.database import AsyncSessionLocal
+from app.repositories.user import UserRepository
 from app.routers import auth, discs, users, admin, webhooks
 from app.services.storage import get_storage_client
 
@@ -25,9 +28,23 @@ async def _ensure_storage_bucket() -> None:
     await asyncio.to_thread(_create)
 
 
+async def _promote_seed_admins(db: AsyncSession) -> None:
+    emails = settings.ADMIN_EMAILS
+    if not emails:
+        return
+    repo = UserRepository(db)
+    users = await repo.get_by_emails(emails)
+    for user in users:
+        if not user.is_admin:
+            await repo.update(user, is_admin=True)
+    await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _ensure_storage_bucket()
+    async with AsyncSessionLocal() as db:
+        await _promote_seed_admins(db)
     yield
 
 
