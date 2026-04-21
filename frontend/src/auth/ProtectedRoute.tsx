@@ -22,9 +22,10 @@ export function ProtectedRoute({ requireAdmin = false }: Props) {
 }
 
 function AdminGuard() {
-  const { data: user, isLoading } = useGetMe()
+  const { data: user, isLoading, isError } = useGetMe()
 
   if (isLoading) return <div className="p-8 text-center">Loading…</div>
+  if (isError) return <Navigate to="/" replace />
   if (!user?.is_admin) return <Navigate to="/my/discs" replace />
 
   return <Outlet />
