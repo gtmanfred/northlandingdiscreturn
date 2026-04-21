@@ -30,6 +30,12 @@ class UserRepository:
         result = await self.db.execute(select(User).where(User.google_id == google_id))
         return result.scalar_one_or_none()
 
+    async def get_by_emails(self, emails: list[str]) -> list[User]:
+        if not emails:
+            return []
+        result = await self.db.execute(select(User).where(User.email.in_(emails)))
+        return list(result.scalars().all())
+
     async def update(self, user: User, **kwargs) -> User:
         for key, value in kwargs.items():
             setattr(user, key, value)
