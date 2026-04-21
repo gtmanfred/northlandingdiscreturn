@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -51,9 +52,11 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="North Landing Disc Return", version="0.1.0", lifespan=lifespan)
     app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+    parsed = urlparse(settings.FRONTEND_URL)
+    cors_origin = f"{parsed.scheme}://{parsed.netloc}"
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.FRONTEND_URL],
+        allow_origins=[cors_origin],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
