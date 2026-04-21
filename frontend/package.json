@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate": "orval"
+    "generate": "orval",
+    "generate:schema": "cd .. && uv run python scripts/generate-openapi.py && cd frontend"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.99.2",

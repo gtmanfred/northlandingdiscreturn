@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 
-    @app.get("/health")
+    @app.get("/health", include_in_schema=False)
     async def health():
         return {"status": "ok"}
 

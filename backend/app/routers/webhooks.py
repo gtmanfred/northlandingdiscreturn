@@ -17,7 +17,7 @@ def validate_twilio_signature(request_url: str, params: dict, signature: str) ->
     return hmac.compare_digest(expected, signature)
 
 
-@router.post("/twilio")
+@router.post("/twilio", operation_id="twilioWebhook", include_in_schema=False)
 async def twilio_inbound(request: Request):
     form = await request.form()
     params = dict(form)
