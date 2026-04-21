@@ -49,7 +49,7 @@ async def get_phone_suggestions(
     result1 = await db.execute(
         select(PhoneNumber.number, User.name, User.email)
         .join(User, PhoneNumber.user_id == User.id)
-        .where(func.lower(User.name) == func.lower(owner_name))
+        .where(User.name.ilike(owner_name))
         .where(PhoneNumber.verified.is_(True))
     )
     registered: dict[str, PhoneSuggestion] = {
@@ -63,7 +63,7 @@ async def get_phone_suggestions(
     # Phone numbers from past disc records for this owner
     result2 = await db.execute(
         select(distinct(Disc.phone_number))
-        .where(func.lower(Disc.owner_name) == func.lower(owner_name))
+        .where(Disc.owner_name.ilike(owner_name))
         .where(Disc.phone_number.is_not(None))
         .where(Disc.phone_number != "")
     )

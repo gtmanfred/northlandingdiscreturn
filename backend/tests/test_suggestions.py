@@ -133,3 +133,8 @@ async def test_phone_suggestions_deduplicates_registered_wins(db, client):
     matching = [s for s in data if s["number"] == "+15550001111"]
     assert len(matching) == 1
     assert "alice@example.com" in matching[0]["label"]
+
+
+async def test_phone_suggestions_requires_auth(client):
+    resp = await client.get("/suggestions/phone?owner_name=Alice")
+    assert resp.status_code == 401
