@@ -3,6 +3,7 @@ min_version = 'v0.16.0'
 mount = false
 
 [tests.steps]
+sync = "uv sync --extra dev"
 tests = "uv run pytest {posargs}"
 
 [tests.environment]
