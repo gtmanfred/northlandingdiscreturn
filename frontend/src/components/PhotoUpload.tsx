@@ -1,0 +1,73 @@
+import { useCallback, useState } from 'react'
+import { useDropzone } from 'react-dropzone'
+import { useQueryClient } from '@tanstack/react-query'
+import { useUploadDiscPhoto, useDeleteDiscPhoto, getListDiscsQueryKey } from '../api/northlanding'
+
+interface PhotoUploadProps {
+  discId: string
+  existingPhotos: Array<{ id: string; photo_path: string; sort_order: number }>
+}
+
+export function PhotoUpload({ discId, existingPhotos }: PhotoUploadProps) {
+  const queryClient = useQueryClient()
+  const uploadMutation = useUploadDiscPhoto()
+  const deleteMutation = useDeleteDiscPhoto()
+  const [uploading, setUploading] = useState(false)
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      setUploading(true)
+      for (const file of acceptedFiles) {
+        await uploadMutation.mutateAsync({ discId, data: { file } })
+      }
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+      setUploading(false)
+    },
+    [discId, queryClient, uploadMutation],
+  )
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
+    multiple: true,
+  })
+
+  const handleDelete = async (photoId: string) => {
+    await deleteMutation.mutateAsync({ discId, photoId })
+    queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {existingPhotos.map((photo) => (
+          <div key={photo.id} className="relative group w-20 h-20">
+            <img src={photo.photo_path} alt="" className="w-20 h-20 object-cover rounded" />
+            <button
+              onClick={() => handleDelete(photo.id)}
+              className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          isDragActive ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-gray-400'
+        }`}
+      >
+        <input {...getInputProps()} />
+        {uploading ? (
+          <p className="text-gray-500">Uploading…</p>
+        ) : isDragActive ? (
+          <p className="text-green-600">Drop photos here</p>
+        ) : (
+          <p className="text-gray-500">Drag & drop photos here, or click to select</p>
+        )}
+      </div>
+    </div>
+  )
+}
