@@ -3,7 +3,10 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config import settings
 from app.database import get_db
 from app.deps import require_admin
 from app.models.user import User
@@ -34,13 +37,19 @@ async def update_user(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    repo = UserRepository(db)
-    user = await repo.get_by_id(user_id)
+    result = await db.execute(
+        select(User).options(selectinload(User.phone_numbers)).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    if body.is_admin is False and user.is_admin is True and user.email in settings.ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Cannot demote a seed admin")
+    repo = UserRepository(db)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
-    user = await repo.update(user, **updates)
+    await repo.update(user, **updates)
     await db.commit()
+    await db.refresh(user, attribute_names=["phone_numbers"])
     return user
 
 
