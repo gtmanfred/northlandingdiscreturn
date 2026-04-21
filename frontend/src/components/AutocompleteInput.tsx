@@ -26,7 +26,8 @@ export function AutocompleteInput({
   const filtered = suggestions.filter((s) =>
     s.value.toLowerCase().includes(inputStr.toLowerCase()),
   )
-  const safeActiveIndex = activeIndex >= filtered.length ? filtered.length - 1 : activeIndex
+  // Clamp to last valid index; yields -1 when list is empty (safe — Enter guard checks >= 0)
+  const safeActiveIndex = activeIndex < filtered.length ? activeIndex : filtered.length - 1
   const isOpen = open && filtered.length > 0
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export function AutocompleteInput({
         role="combobox"
         aria-expanded={isOpen}
         aria-controls={listId}
-        aria-activedescendant={safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
+        aria-activedescendant={isOpen && safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
         autoComplete="off"
         className={className ?? 'w-full border border-gray-300 rounded px-3 py-2'}
       />
