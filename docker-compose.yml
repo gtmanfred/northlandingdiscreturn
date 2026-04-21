@@ -56,6 +56,7 @@ services:
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       SUPABASE_BUCKET: disc-photos
       FRONTEND_URL: http://localhost:5173
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     volumes:
       - ./backend:/srv
       - backend_venv:/srv/.venv
