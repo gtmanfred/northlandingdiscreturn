@@ -6,7 +6,7 @@
 
 **Architecture:** API-first layered monolith — routers → services → repositories → models. Admin-triggered SMS notifications write `SMSJob` rows; a separate worker process polls and sends via Twilio. Supabase provides Postgres and file storage.
 
-**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2.0 async, asyncpg, Alembic, pydantic-settings, python-jose, authlib, httpx, twilio, supabase-py, APScheduler, pytest, pytest-asyncio, uv
+**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2.0 async, asyncpg, Alembic, figenv, python-jose, authlib, httpx, twilio, supabase-py, APScheduler, pytest, pytest-asyncio, uv
 
 > **Note:** This is Plan 1 of 3. Plan 2 covers the React/Vite frontend. Plan 3 covers Docker, Fly.io, and CI/CD.
 
@@ -74,11 +74,15 @@ backend/
 
 **Files:**
 - Create: `backend/pyproject.toml`
+- Create: `backend/Dockerfile.j2`
+- Create: `backend/teststack.toml`
 - Create: `backend/app/__init__.py`
 - Create: `backend/app/config.py`
 - Create: `backend/app/main.py`
 - Create: `backend/tests/conftest.py`
 - Create: `backend/tests/test_health.py`
+
+> **Test runner:** Use `teststack run` (not `uv run pytest` directly). teststack spins up a Postgres container and injects `DATABASE_URL` and other env vars into the test container automatically.
 
 - [ ] **Step 1: Initialize backend directory and pyproject.toml**
 
@@ -103,7 +107,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.29",
     "alembic>=1.13",
-    "pydantic-settings>=2.5",
+    "figenv>=0.5",
     "python-jose[cryptography]>=3.3",
     "authlib>=1.3",
     "httpx>=0.27",
@@ -122,17 +126,6 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-env = [
-    "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/test_northlanding",
-    "SECRET_KEY=test-secret-key-for-tests-only",
-    "GOOGLE_CLIENT_ID=test-client-id",
-    "GOOGLE_CLIENT_SECRET=test-client-secret",
-    "TWILIO_ACCOUNT_SID=ACtest",
-    "TWILIO_AUTH_TOKEN=test-auth-token",
-    "TWILIO_FROM_NUMBER=+15550000000",
-    "SUPABASE_URL=https://test.supabase.co",
-    "SUPABASE_SERVICE_KEY=test-service-key",
-]
 ```
 
 - [ ] **Step 2: Install dependencies**
@@ -148,29 +141,26 @@ Expected: packages installed into `.venv/`
 
 ```python
 # backend/app/config.py
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import figenv
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    database_url: str
-    secret_key: str
-    google_client_id: str
-    google_client_secret: str
-    twilio_account_sid: str
-    twilio_auth_token: str
-    twilio_from_number: str
-    supabase_url: str
-    supabase_service_key: str
-    supabase_bucket: str = "disc-photos"
-
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60
-    frontend_url: str = "http://localhost:5173"
+class Config(metaclass=figenv.MetaConfig):
+    DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/northlanding"
+    SECRET_KEY = "change-me"
+    GOOGLE_CLIENT_ID = ""
+    GOOGLE_CLIENT_SECRET = ""
+    TWILIO_ACCOUNT_SID = ""
+    TWILIO_AUTH_TOKEN = ""
+    TWILIO_FROM_NUMBER = ""
+    SUPABASE_URL = ""
+    SUPABASE_SERVICE_KEY = ""
+    SUPABASE_BUCKET = "disc-photos"
+    JWT_ALGORITHM = "HS256"
+    JWT_EXPIRE_MINUTES = 60
+    FRONTEND_URL = "http://localhost:5173"
 
 
-settings = Settings()
+settings = Config
 ```
 
 - [ ] **Step 4: Write main.py**
@@ -187,7 +177,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="North Landing Disc Return", version="0.1.0")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_url],
+        allow_origins=[settings.FRONTEND_URL],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -267,7 +257,7 @@ from app.config import settings
 @pytest_asyncio.fixture(scope="session")
 async def engine():
     from app.models.base import Base
-    engine = create_async_engine(settings.database_url)
+    engine = create_async_engine(settings.DATABASE_URL)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -296,21 +286,68 @@ async def client(db):
     app.dependency_overrides.clear()
 ```
 
-- [ ] **Step 7: Run test**
+- [ ] **Step 7: Write `backend/Dockerfile.j2`**
+
+teststack renders this Jinja2 template into a Dockerfile for the test container:
+
+```dockerfile
+FROM docker.io/python:3.12-slim
+WORKDIR /srv
+RUN pip install uv
+COPY pyproject.toml ./
+RUN uv sync --extra dev
+COPY . .
+```
+
+- [ ] **Step 8: Write `backend/teststack.toml`**
+
+```toml
+[tests]
+min_version = 'v0.16.0'
+
+[tests.steps]
+tests = "uv run pytest {posargs}"
+
+[tests.environment]
+SECRET_KEY = "test-secret-key-for-tests-only"
+GOOGLE_CLIENT_ID = "test-client-id"
+GOOGLE_CLIENT_SECRET = "test-client-secret"
+TWILIO_ACCOUNT_SID = "ACtest"
+TWILIO_AUTH_TOKEN = "test-auth-token"
+TWILIO_FROM_NUMBER = "+15550000000"
+SUPABASE_URL = "https://test.supabase.co"
+SUPABASE_SERVICE_KEY = "test-service-key"
+
+[services.database]
+image = "docker.io/postgres:16"
+
+[services.database.ports]
+"5432/tcp" = ""
+
+[services.database.environment]
+POSTGRES_USER = "northlanding"
+POSTGRES_PASSWORD = "secret"
+POSTGRES_DB = "northlanding_test"
+
+[services.database.export]
+DATABASE_URL = "postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{HOST}:{PORT;5432/tcp}/{POSTGRES_DB}"
+```
+
+- [ ] **Step 9: Run tests via teststack**
 
 ```bash
 cd backend
-uv run pytest tests/test_health.py -v
+teststack run --step tests -- tests/test_health.py -v
 ```
 
 Expected: `PASSED tests/test_health.py::test_health`
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 cd backend
 git add .
-git commit -m "feat: initialize backend project with FastAPI health endpoint"
+git commit -m "feat: initialize backend project with FastAPI health endpoint and teststack"
 ```
 
 ---
@@ -330,7 +367,7 @@ git commit -m "feat: initialize backend project with FastAPI health endpoint"
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from app.config import settings
 
-engine = create_async_engine(settings.database_url, echo=False)
+engine = create_async_engine(settings.DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -379,7 +416,7 @@ import app.models.disc  # noqa
 import app.models.pickup_event  # noqa
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
