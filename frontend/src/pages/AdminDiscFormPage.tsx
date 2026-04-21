@@ -8,6 +8,7 @@ import {
   useGetSuggestions,
   useGetPhoneSuggestions,
   getListDiscsQueryKey,
+  getGetSuggestionsQueryKey,
 } from '../api/northlanding'
 import { AutocompleteInput, type Suggestion } from '../components/AutocompleteInput'
 import { PhotoUpload } from '../components/PhotoUpload'
@@ -54,7 +55,10 @@ export function AdminDiscFormPage() {
   const { data: manufacturerSuggestions = [] } = useGetSuggestions({ field: 'manufacturer' })
   const { data: nameSuggestions = [] } = useGetSuggestions({ field: 'name' })
   const { data: colorSuggestions = [] } = useGetSuggestions({ field: 'color' })
-  const { data: ownerNameSuggestions = [] } = useGetSuggestions({ field: 'owner_name' })
+  const { data: ownerNameSuggestions = [] } = useGetSuggestions(
+    { field: 'owner_name' },
+    { query: { retry: false } },
+  )
   const { data: rawPhoneSuggestions = [] } = useGetPhoneSuggestions(
     { owner_name: form.owner_name },
     { query: { enabled: !!form.owner_name } },
@@ -109,6 +113,7 @@ export function AdminDiscFormPage() {
         await createMutation.mutateAsync({ data: payload })
       }
       queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+      queryClient.invalidateQueries({ queryKey: getGetSuggestionsQueryKey() })
       navigate('/admin/discs')
     } catch {
       setError(isEdit ? 'Failed to update disc.' : 'Failed to create disc.')

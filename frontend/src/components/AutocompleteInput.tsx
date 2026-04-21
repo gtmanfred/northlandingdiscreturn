@@ -79,6 +79,8 @@ export function AutocompleteInput({
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         role="combobox"
+        aria-haspopup="listbox"
+        aria-autocomplete="list"
         aria-expanded={isOpen}
         aria-controls={listId}
         aria-activedescendant={isOpen && safeActiveIndex >= 0 ? `${listId}-${safeActiveIndex}` : undefined}
