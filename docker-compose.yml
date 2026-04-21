@@ -1,0 +1,83 @@
+name: northlanding
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: northlanding
+      POSTGRES_USER: northlanding
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/init-storage-schema.sql:/docker-entrypoint-initdb.d/01-init-storage-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U northlanding -d northlanding"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  storage:
+    image: supabase/storage-api:v0.40.4
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      AUTH_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      DATABASE_URL: postgres://northlanding:secret@db:5432/northlanding
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - storage_data:/var/lib/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://northlanding:secret@db:5432/northlanding
+      SECRET_KEY: ${SECRET_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      SUPABASE_URL: http://storage:5000
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      SUPABASE_BUCKET: disc-photos
+      FRONTEND_URL: http://localhost:5173
+    volumes:
+      - ./backend:/srv
+      - backend_venv:/srv/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+
+volumes:
+  pg_data:
+  storage_data:
+  backend_venv:
