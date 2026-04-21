@@ -7,7 +7,7 @@ app = 'northlandingdiscreturn-api'
 primary_region = 'ord'
 
 [build]
-  dockerfile = 'backend/Dockerfile'
+  dockerfile = 'Dockerfile'
 
 [deploy]
   release_command = 'uv run alembic upgrade head'
