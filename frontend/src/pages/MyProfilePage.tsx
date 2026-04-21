@@ -102,10 +102,11 @@ export function MyProfilePage() {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerify} className="flex gap-2">
-            <p className="text-sm text-gray-600 mb-2">
+          <form onSubmit={handleVerify} className="flex flex-col gap-2">
+            <p className="text-sm text-gray-600">
               Enter the 6-digit code sent to {pendingNumber}:
             </p>
+            <div className="flex gap-2">
             <input
               type="text"
               placeholder="123456"
@@ -121,6 +122,7 @@ export function MyProfilePage() {
             >
               Verify
             </button>
+            </div>
           </form>
         )}
         {error && <p className="mt-2 text-red-600 text-sm">{error}</p>}
