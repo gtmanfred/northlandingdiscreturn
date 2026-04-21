@@ -1117,6 +1117,115 @@
           }
         }
       }
+    },
+    "/suggestions": {
+      "get": {
+        "tags": [
+          "suggestions"
+        ],
+        "summary": "Get Suggestions",
+        "operationId": "getSuggestions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "field",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "manufacturer",
+                "name",
+                "color",
+                "owner_name"
+              ],
+              "type": "string",
+              "title": "Field"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Getsuggestions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suggestions/phone": {
+      "get": {
+        "tags": [
+          "suggestions"
+        ],
+        "summary": "Get Phone Suggestions",
+        "operationId": "getPhoneSuggestions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "owner_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Owner Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PhoneSuggestion"
+                  },
+                  "title": "Response Getphonesuggestions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1524,6 +1633,24 @@
           "verified_at"
         ],
         "title": "PhoneNumberOut"
+      },
+      "PhoneSuggestion": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "label"
+        ],
+        "title": "PhoneSuggestion"
       },
       "PickupEventCreate": {
         "properties": {

@@ -127,6 +127,11 @@ export interface PhoneNumberOut {
   verified_at: PhoneNumberOutVerifiedAt;
 }
 
+export interface PhoneSuggestion {
+  number: string;
+  label: string;
+}
+
 export type PickupEventCreateNotes = string | null;
 
 export interface PickupEventCreate {
@@ -205,18 +210,34 @@ export interface WishlistDiscCreate {
   notes?: WishlistDiscCreateNotes;
 }
 
-export type ListDiscsParamsIsFound = boolean | null;
-
-export type ListDiscsParamsIsReturned = boolean | null;
-
-export type ListDiscsParamsOwnerName = string | null;
-
 export type ListDiscsParams = {
 page?: number;
 page_size?: number;
-is_found?: ListDiscsParamsIsFound;
-is_returned?: ListDiscsParamsIsReturned;
-owner_name?: ListDiscsParamsOwnerName;
+is_found?: boolean | null;
+is_returned?: boolean | null;
+owner_name?: string | null;
+};
+
+export type GetSuggestionsParams = {
+field: GetSuggestionsField;
+};
+
+export type GetSuggestionsField = typeof GetSuggestionsField[keyof typeof GetSuggestionsField];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetSuggestionsField = {
+  manufacturer: 'manufacturer',
+  name: 'name',
+  color: 'color',
+  owner_name: 'owner_name',
+} as const;
+
+export type GetPhoneSuggestionsParams = {
+/**
+ * @minLength 1
+ */
+owner_name: string;
 };
 
 /**
@@ -2047,3 +2068,186 @@ export const useAdminNotifyPickupEvent = <TError = ErrorType<HTTPValidationError
 
       return useMutation(mutationOptions, queryClient);
     }
+    
+/**
+ * @summary Get Suggestions
+ */
+export const getSuggestions = (
+    params: GetSuggestionsParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<string[]>(
+      {url: `/suggestions`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getGetSuggestionsQueryKey = (params?: GetSuggestionsParams,) => {
+    return [
+    `/suggestions`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetSuggestionsQueryOptions = <TData = Awaited<ReturnType<typeof getSuggestions>>, TError = ErrorType<HTTPValidationError>>(params: GetSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSuggestions>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSuggestionsQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSuggestions>>> = ({ signal }) => getSuggestions(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSuggestions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSuggestionsQueryResult = NonNullable<Awaited<ReturnType<typeof getSuggestions>>>
+export type GetSuggestionsQueryError = ErrorType<HTTPValidationError>
+
+
+export function useGetSuggestions<TData = Awaited<ReturnType<typeof getSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetSuggestionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSuggestions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSuggestions>>,
+          TError,
+          Awaited<ReturnType<typeof getSuggestions>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSuggestions<TData = Awaited<ReturnType<typeof getSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSuggestions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSuggestions>>,
+          TError,
+          Awaited<ReturnType<typeof getSuggestions>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSuggestions<TData = Awaited<ReturnType<typeof getSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSuggestions>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Suggestions
+ */
+
+export function useGetSuggestions<TData = Awaited<ReturnType<typeof getSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSuggestions>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSuggestionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Get Phone Suggestions
+ */
+export const getPhoneSuggestions = (
+    params: GetPhoneSuggestionsParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<PhoneSuggestion[]>(
+      {url: `/suggestions/phone`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getGetPhoneSuggestionsQueryKey = (params?: GetPhoneSuggestionsParams,) => {
+    return [
+    `/suggestions/phone`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetPhoneSuggestionsQueryOptions = <TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPhoneSuggestionsQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPhoneSuggestions>>> = ({ signal }) => getPhoneSuggestions(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPhoneSuggestionsQueryResult = NonNullable<Awaited<ReturnType<typeof getPhoneSuggestions>>>
+export type GetPhoneSuggestionsQueryError = ErrorType<HTTPValidationError>
+
+
+export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetPhoneSuggestionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPhoneSuggestions>>,
+          TError,
+          Awaited<ReturnType<typeof getPhoneSuggestions>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPhoneSuggestions>>,
+          TError,
+          Awaited<ReturnType<typeof getPhoneSuggestions>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Phone Suggestions
+ */
+
+export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
+ params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPhoneSuggestionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
