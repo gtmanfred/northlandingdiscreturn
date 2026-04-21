@@ -19,13 +19,13 @@ oauth.register(
 )
 
 
-@router.get("/google")
+@router.get("/google", operation_id="googleLogin")
 async def login_google(request: Request):
     redirect_uri = str(request.url_for("auth_google_callback"))
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
-@router.get("/google/callback", name="auth_google_callback")
+@router.get("/google/callback", name="auth_google_callback", operation_id="googleCallback")
 async def auth_google_callback(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -50,6 +50,6 @@ async def auth_google_callback(
     return RedirectResponse(url=redirect_url)
 
 
-@router.post("/logout")
+@router.post("/logout", operation_id="logout")
 async def logout():
     return {"message": "logged out"}

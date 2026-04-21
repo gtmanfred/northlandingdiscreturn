@@ -18,7 +18,7 @@ from app.services.notification import enqueue_pickup_notifications
 router = APIRouter()
 
 
-@router.get("/users", response_model=list[UserOut])
+@router.get("/users", response_model=list[UserOut], operation_id="adminListUsers")
 async def list_users(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -27,7 +27,7 @@ async def list_users(
     return await repo.list_all()
 
 
-@router.patch("/users/{user_id}", response_model=UserOut)
+@router.patch("/users/{user_id}", response_model=UserOut, operation_id="adminUpdateUser")
 async def update_user(
     user_id: uuid.UUID,
     body: UpdateUserRequest,
@@ -44,7 +44,7 @@ async def update_user(
     return user
 
 
-@router.get("/users/{user_id}/wishlist", response_model=list[DiscOut])
+@router.get("/users/{user_id}/wishlist", response_model=list[DiscOut], operation_id="adminGetUserWishlist")
 async def get_user_wishlist(
     user_id: uuid.UUID,
     _: Annotated[User, Depends(require_admin)],
@@ -62,7 +62,7 @@ async def get_user_wishlist(
     return await disc_repo.list_wishlist_by_phones(numbers)
 
 
-@router.post("/users/{user_id}/wishlist", response_model=DiscOut, status_code=201)
+@router.post("/users/{user_id}/wishlist", response_model=DiscOut, status_code=201, operation_id="adminAddUserWishlist")
 async def add_user_wishlist(
     user_id: uuid.UUID,
     body: WishlistDiscCreate,
@@ -88,7 +88,7 @@ async def add_user_wishlist(
     return disc
 
 
-@router.delete("/users/{user_id}/wishlist/{disc_id}", status_code=204)
+@router.delete("/users/{user_id}/wishlist/{disc_id}", status_code=204, operation_id="adminRemoveUserWishlist")
 async def remove_user_wishlist(
     user_id: uuid.UUID,
     disc_id: uuid.UUID,
@@ -103,7 +103,7 @@ async def remove_user_wishlist(
     await db.commit()
 
 
-@router.get("/pickup-events", response_model=list[PickupEventOut])
+@router.get("/pickup-events", response_model=list[PickupEventOut], operation_id="adminListPickupEvents")
 async def list_pickup_events(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -112,7 +112,7 @@ async def list_pickup_events(
     return await repo.list_events()
 
 
-@router.post("/pickup-events", response_model=PickupEventOut, status_code=201)
+@router.post("/pickup-events", response_model=PickupEventOut, status_code=201, operation_id="adminCreatePickupEvent")
 async def create_pickup_event(
     body: PickupEventCreate,
     _: Annotated[User, Depends(require_admin)],
@@ -124,7 +124,7 @@ async def create_pickup_event(
     return event
 
 
-@router.patch("/pickup-events/{event_id}", response_model=PickupEventOut)
+@router.patch("/pickup-events/{event_id}", response_model=PickupEventOut, operation_id="adminUpdatePickupEvent")
 async def update_pickup_event(
     event_id: uuid.UUID,
     body: PickupEventUpdate,
@@ -141,7 +141,7 @@ async def update_pickup_event(
     return event
 
 
-@router.post("/pickup-events/{event_id}/notify", response_model=NotifyResult)
+@router.post("/pickup-events/{event_id}/notify", response_model=NotifyResult, operation_id="adminNotifyPickupEvent")
 async def notify_pickup_event(
     event_id: uuid.UUID,
     _: Annotated[User, Depends(require_admin)],

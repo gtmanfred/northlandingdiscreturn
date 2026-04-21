@@ -15,7 +15,7 @@ from app.services.storage import upload_photo, delete_photo, get_public_url
 router = APIRouter()
 
 
-@router.get("", response_model=DiscPage)
+@router.get("", response_model=DiscPage, operation_id="listDiscs")
 async def list_discs(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -40,7 +40,7 @@ async def list_discs(
     )
 
 
-@router.post("", response_model=DiscOut, status_code=201)
+@router.post("", response_model=DiscOut, status_code=201, operation_id="createDisc")
 async def create_disc(
     body: DiscCreate,
     _: Annotated[User, Depends(require_admin)],
@@ -53,7 +53,7 @@ async def create_disc(
     return disc
 
 
-@router.patch("/{disc_id}", response_model=DiscOut)
+@router.patch("/{disc_id}", response_model=DiscOut, operation_id="updateDisc")
 async def update_disc(
     disc_id: uuid.UUID,
     body: DiscUpdate,
@@ -73,7 +73,7 @@ async def update_disc(
     return disc
 
 
-@router.delete("/{disc_id}", status_code=204)
+@router.delete("/{disc_id}", status_code=204, operation_id="deleteDisc")
 async def delete_disc(
     disc_id: uuid.UUID,
     _: Annotated[User, Depends(require_admin)],
@@ -87,7 +87,7 @@ async def delete_disc(
     await db.commit()
 
 
-@router.post("/{disc_id}/photos", response_model=DiscPhotoOut, status_code=201)
+@router.post("/{disc_id}/photos", response_model=DiscPhotoOut, status_code=201, operation_id="uploadDiscPhoto")
 async def upload_disc_photo(
     disc_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -109,7 +109,7 @@ async def upload_disc_photo(
     return photo
 
 
-@router.delete("/{disc_id}/photos/{photo_id}", status_code=204)
+@router.delete("/{disc_id}/photos/{photo_id}", status_code=204, operation_id="deleteDiscPhoto")
 async def delete_disc_photo(
     disc_id: uuid.UUID,
     photo_id: uuid.UUID,

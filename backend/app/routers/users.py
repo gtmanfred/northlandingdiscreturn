@@ -17,7 +17,7 @@ from app.services.auth import generate_verification_code, send_verification_sms
 router = APIRouter()
 
 
-@router.get("/me", response_model=UserOut)
+@router.get("/me", response_model=UserOut, operation_id="getMe")
 async def get_me(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -29,7 +29,7 @@ async def get_me(
     return user
 
 
-@router.post("/me/phones", response_model=PhoneNumberOut)
+@router.post("/me/phones", response_model=PhoneNumberOut, operation_id="addPhone")
 async def add_phone(
     body: AddPhoneRequest,
     background_tasks: BackgroundTasks,
@@ -52,7 +52,7 @@ async def add_phone(
     return phone
 
 
-@router.post("/me/phones/verify", response_model=PhoneNumberOut)
+@router.post("/me/phones/verify", response_model=PhoneNumberOut, operation_id="verifyPhone")
 async def verify_phone(
     body: VerifyPhoneRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -73,7 +73,7 @@ async def verify_phone(
     return phone
 
 
-@router.delete("/me/phones/{number}", status_code=204)
+@router.delete("/me/phones/{number}", status_code=204, operation_id="removePhone")
 async def remove_phone(
     number: str,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -87,7 +87,7 @@ async def remove_phone(
     await db.commit()
 
 
-@router.get("/me/wishlist", response_model=list[DiscOut])
+@router.get("/me/wishlist", response_model=list[DiscOut], operation_id="getMyWishlist")
 async def get_my_wishlist(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -101,7 +101,7 @@ async def get_my_wishlist(
     return await disc_repo.list_wishlist_by_phones(numbers)
 
 
-@router.post("/me/wishlist", response_model=DiscOut, status_code=201)
+@router.post("/me/wishlist", response_model=DiscOut, status_code=201, operation_id="addWishlistDisc")
 async def add_wishlist_disc(
     body: WishlistDiscCreate,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -123,7 +123,7 @@ async def add_wishlist_disc(
     return await disc_repo.get_by_id(disc.id)
 
 
-@router.delete("/me/wishlist/{disc_id}", status_code=204)
+@router.delete("/me/wishlist/{disc_id}", status_code=204, operation_id="removeWishlistDisc")
 async def remove_wishlist_disc(
     disc_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
