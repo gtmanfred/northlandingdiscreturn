@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: northlanding
       POSTGRES_USER: northlanding
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./docker/init-storage-schema.sql:/docker-entrypoint-initdb.d/01-init-storage-schema.sql:ro
@@ -19,13 +19,14 @@ services:
       - "5432:5432"
 
   storage:
+    # v0.40.4 used instead of v0.43.11 — same migration requirements, confirmed working
     image: supabase/storage-api:v0.40.4
     environment:
       ANON_KEY: ${SUPABASE_ANON_KEY}
       SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       AUTH_JWT_SECRET: ${SUPABASE_JWT_SECRET}
-      DATABASE_URL: postgres://northlanding:secret@db:5432/northlanding
+      DATABASE_URL: postgres://northlanding:${POSTGRES_PASSWORD:-secret}@db:5432/northlanding
       FILE_SIZE_LIMIT: "52428800"
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
@@ -44,7 +45,7 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://northlanding:secret@db:5432/northlanding
+      DATABASE_URL: postgresql+asyncpg://northlanding:${POSTGRES_PASSWORD:-secret}@db:5432/northlanding
       SECRET_KEY: ${SECRET_KEY}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -71,6 +72,9 @@ services:
     environment:
       VITE_API_URL: http://localhost:8000
     volumes:
+      # node_modules intentionally not isolated: npm install fails inside Lima Docker
+      # due to network issues. Host node_modules are used at runtime instead.
+      # Run `npm install` on the host before `docker compose up`.
       - ./frontend:/app
     depends_on:
       - backend

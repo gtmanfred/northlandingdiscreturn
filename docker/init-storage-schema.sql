@@ -1,7 +1,9 @@
 -- Create the storage schema required by supabase/storage-api.
+-- Verified against supabase/storage-api:v0.40.4 (pinned in docker-compose.yml).
 -- This provides the base tables that the storage-api tenant migrations build upon.
 -- Columns added by individual migrations (0007, 0011, 0012, 0013, 0015, 0016)
 -- are intentionally omitted here and will be added by the storage-api on startup.
+-- If upgrading the storage-api version, re-verify that this schema is still compatible.
 
 CREATE SCHEMA IF NOT EXISTS storage;
 
