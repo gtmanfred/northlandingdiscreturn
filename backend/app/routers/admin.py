@@ -43,7 +43,7 @@ async def update_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if body.is_admin is False and user.email in settings.ADMIN_EMAILS:
+    if body.is_admin is False and user.is_admin is True and user.email in settings.ADMIN_EMAILS:
         raise HTTPException(status_code=403, detail="Cannot demote a seed admin")
     repo = UserRepository(db)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
