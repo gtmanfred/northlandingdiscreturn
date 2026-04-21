@@ -13,6 +13,7 @@ import {
 import { AutocompleteInput, type Suggestion } from '../components/AutocompleteInput'
 import { PhotoUpload } from '../components/PhotoUpload'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PhoneInput } from '../components/PhoneInput'
 import { normalizePhone } from '../utils/phone'
 
 interface DiscFormState {
@@ -186,13 +187,17 @@ export function AdminDiscFormPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-          <AutocompleteInput
-            type="tel"
-            placeholder="(555) 123-4567"
-            value={form.phone_number}
-            suggestions={phoneSuggestions}
-            onValueChange={setValue('phone_number')}
-          />
+          {phoneSuggestions.length > 0 ? (
+            <AutocompleteInput
+              type="tel"
+              placeholder="(555) 123-4567"
+              value={form.phone_number}
+              suggestions={phoneSuggestions}
+              onValueChange={setValue('phone_number')}
+            />
+          ) : (
+            <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
+          )}
         </div>
 
         <div className="flex gap-6">

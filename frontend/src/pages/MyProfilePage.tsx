@@ -8,6 +8,7 @@ import {
   getGetMeQueryKey,
 } from '../api/northlanding'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PhoneInput } from '../components/PhoneInput'
 import { normalizePhone } from '../utils/phone'
 
 type Step = 'idle' | 'code-sent'
@@ -100,24 +101,15 @@ export function MyProfilePage() {
 
       <div className="mt-6">
         {step === 'idle' ? (
-          <form onSubmit={handleAddPhone} className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <input
-                type="tel"
-                placeholder="(555) 123-4567"
-                value={newNumber}
-                onChange={(e) => setNewNumber(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-2 flex-1"
-              />
-              <button
-                type="submit"
-                disabled={addPhone.isPending}
-                className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
-              >
-                Add Phone
-              </button>
-            </div>
-            <p className="text-xs text-gray-400">US numbers only — any format accepted.</p>
+          <form onSubmit={handleAddPhone} className="flex flex-col gap-3">
+            <PhoneInput value={newNumber} onChange={setNewNumber} />
+            <button
+              type="submit"
+              disabled={addPhone.isPending}
+              className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50 self-start"
+            >
+              Add Phone
+            </button>
           </form>
         ) : (
           <form onSubmit={handleVerify} className="flex flex-col gap-2">
