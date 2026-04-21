@@ -5,6 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'build' ? '/northlandingdiscreturn/' : '/',
+  server: {
+    host: true,
+    watch: {
+      usePolling: true,
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',
