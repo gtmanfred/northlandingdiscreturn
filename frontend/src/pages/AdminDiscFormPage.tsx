@@ -5,8 +5,11 @@ import {
   useCreateDisc,
   useUpdateDisc,
   useListDiscs,
+  useGetSuggestions,
+  useGetPhoneSuggestions,
   getListDiscsQueryKey,
 } from '../api/northlanding'
+import { AutocompleteInput, type Suggestion } from '../components/AutocompleteInput'
 import { PhotoUpload } from '../components/PhotoUpload'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
@@ -48,6 +51,19 @@ export function AdminDiscFormPage() {
 
   const [form, setForm] = useState<DiscFormState>(defaultForm)
 
+  const { data: manufacturerSuggestions = [] } = useGetSuggestions({ field: 'manufacturer' })
+  const { data: nameSuggestions = [] } = useGetSuggestions({ field: 'name' })
+  const { data: colorSuggestions = [] } = useGetSuggestions({ field: 'color' })
+  const { data: ownerNameSuggestions = [] } = useGetSuggestions({ field: 'owner_name' })
+  const { data: rawPhoneSuggestions = [] } = useGetPhoneSuggestions(
+    { owner_name: form.owner_name },
+    { query: { enabled: !!form.owner_name } },
+  )
+  const phoneSuggestions: Suggestion[] = rawPhoneSuggestions.map((s) => ({
+    value: s.number,
+    label: s.label,
+  }))
+
   useEffect(() => {
     if (existingDisc) {
       setForm({
@@ -71,6 +87,12 @@ export function AdminDiscFormPage() {
   const set = (field: keyof DiscFormState) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((f) => ({ ...f, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+
+  const setValue = (field: keyof DiscFormState) => (value: string) =>
+    setForm((f) => ({ ...f, [field]: value }))
+
+  const handleOwnerNameChange = (value: string) =>
+    setForm((f) => ({ ...f, owner_name: value, phone_number: '' }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -107,14 +129,22 @@ export function AdminDiscFormPage() {
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {(['manufacturer', 'name', 'color'] as const).map((field) => (
+        {(
+          [
+            { field: 'manufacturer', suggestions: manufacturerSuggestions },
+            { field: 'name', suggestions: nameSuggestions },
+            { field: 'color', suggestions: colorSuggestions },
+          ] as const
+        ).map(({ field, suggestions }) => (
           <div key={field}>
-            <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">{field} *</label>
-            <input
+            <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
+              {field} *
+            </label>
+            <AutocompleteInput
               required
               value={form[field]}
-              onChange={set(field)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              suggestions={suggestions.map((v) => ({ value: v }))}
+              onValueChange={setValue(field)}
             />
           </div>
         ))}
@@ -132,17 +162,21 @@ export function AdminDiscFormPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
-          <input value={form.owner_name} onChange={set('owner_name')} className="w-full border border-gray-300 rounded px-3 py-2" />
+          <AutocompleteInput
+            value={form.owner_name}
+            suggestions={ownerNameSuggestions.map((v) => ({ value: v }))}
+            onValueChange={handleOwnerNameChange}
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number (E.164)</label>
-          <input
+          <AutocompleteInput
             type="tel"
             placeholder="+15551234567"
             value={form.phone_number}
-            onChange={set('phone_number')}
-            className="w-full border border-gray-300 rounded px-3 py-2"
+            suggestions={phoneSuggestions}
+            onValueChange={setValue('phone_number')}
           />
         </div>
 
