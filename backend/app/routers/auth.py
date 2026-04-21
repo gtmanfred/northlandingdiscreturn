@@ -4,6 +4,7 @@ from authlib.integrations.starlette_client import OAuth
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
+from app.models.user import User
 from app.repositories.user import UserRepository
 from app.services.auth import create_access_token
 
@@ -17,6 +18,14 @@ oauth.register(
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
 )
+
+
+async def _maybe_promote_to_admin(
+    user: User, email: str, repo: UserRepository, db: AsyncSession
+) -> None:
+    if email in settings.ADMIN_EMAILS and not user.is_admin:
+        await repo.update(user, is_admin=True)
+        await db.commit()
 
 
 @router.get("/google", operation_id="googleLogin")
@@ -44,6 +53,8 @@ async def auth_google_callback(
             google_id=user_info["sub"],
         )
         await db.commit()
+
+    await _maybe_promote_to_admin(user, user_info["email"], repo, db)
 
     access_token = create_access_token(str(user.id))
     redirect_url = f"{settings.FRONTEND_URL}/auth/callback?token={access_token}"
