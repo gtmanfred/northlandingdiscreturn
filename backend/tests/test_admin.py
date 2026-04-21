@@ -120,3 +120,41 @@ async def test_notify_pickup_event(client, db):
     assert resp.status_code == 200
     assert resp.json()["sms_jobs_enqueued"] == 1
     assert resp.json()["discs_notified"] == 1
+
+
+async def test_cannot_demote_seed_admin(client, db, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", "seed@test.com")
+    from app.config import settings
+    assert "seed@test.com" in settings.ADMIN_EMAILS
+    admin = await make_admin_user(db)
+    repo = UserRepository(db)
+    seed = await repo.create(name="Seed", email="seed@test.com", google_id="g-seed")
+    seed.is_admin = True
+    await db.commit()
+
+    resp = await client.patch(
+        f"/admin/users/{seed.id}",
+        json={"is_admin": False},
+        headers=admin_token(admin.id),
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Cannot demote a seed admin"
+
+
+async def test_can_demote_non_seed_admin(client, db, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", "seed@test.com")
+    from app.config import settings
+    assert "seed@test.com" in settings.ADMIN_EMAILS
+    admin = await make_admin_user(db)
+    repo = UserRepository(db)
+    other = await repo.create(name="Other", email="other@test.com", google_id="g-other")
+    other.is_admin = True
+    await db.commit()
+
+    resp = await client.patch(
+        f"/admin/users/{other.id}",
+        json={"is_admin": False},
+        headers=admin_token(admin.id),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["is_admin"] is False
