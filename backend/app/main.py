@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.routers import auth, discs, users, admin, webhooks
 from app.services.storage import get_storage_client
+
+logger = logging.getLogger(__name__)
 
 
 async def _ensure_storage_bucket() -> None:
@@ -16,8 +19,8 @@ async def _ensure_storage_bucket() -> None:
         client = get_storage_client()
         try:
             client.storage.create_bucket(settings.SUPABASE_BUCKET, options={"public": True})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Storage bucket creation skipped: %s", e)
 
     await asyncio.to_thread(_create)
 
