@@ -188,6 +188,50 @@ async def test_create_disc_as_admin(client, db):
     assert resp.json()["name"] == "Destroyer"
 
 
+async def test_admin_list_discs_is_found_filter(client, db):
+    admin = await make_admin(db, name="Admin4", email="admin4@example.com", google_id="g-admin4")
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="FoundDisc", color="W", input_date=date.today(), is_found=True)
+    await repo.create(manufacturer="X", name="WishlistDisc", color="W", input_date=date.today(), is_found=False)
+    await db.commit()
+
+    resp = await client.get("/discs?is_found=true", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    names = [d["name"] for d in resp.json()["items"]]
+    assert "FoundDisc" in names
+    assert "WishlistDisc" not in names
+
+    resp2 = await client.get("/discs?is_found=false", headers=admin_headers(admin.id))
+    assert resp2.status_code == 200
+    names2 = [d["name"] for d in resp2.json()["items"]]
+    assert "WishlistDisc" in names2
+    assert "FoundDisc" not in names2
+
+
+async def test_admin_list_discs_owner_name_filter(client, db):
+    admin = await make_admin(db, name="Admin5", email="admin5@example.com", google_id="g-admin5")
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="AliceDisc", color="W", input_date=date.today(), owner_name="Alice")
+    await repo.create(manufacturer="X", name="BobDisc", color="W", input_date=date.today(), owner_name="Bob")
+    await db.commit()
+
+    resp = await client.get("/discs?owner_name=alice", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    names = [d["name"] for d in resp.json()["items"]]
+    assert "AliceDisc" in names
+    assert "BobDisc" not in names
+
+
+async def test_non_admin_ignores_filter_params(client, db):
+    user_repo = UserRepository(db)
+    user = await user_repo.create(name="Regular2", email="reg2@example.com", google_id="g-reg2")
+    await db.commit()
+
+    # Non-admin with is_found filter — should 200 (params silently ignored, returns their discs)
+    resp = await client.get("/discs?is_found=false", headers=admin_headers(user.id))
+    assert resp.status_code == 200
+
+
 async def test_create_disc_non_admin_forbidden(client, db):
     repo = UserRepository(db)
     user = await repo.create(name="Regular", email="reg@example.com", google_id="g-reg")
