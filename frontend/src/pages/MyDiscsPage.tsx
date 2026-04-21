@@ -1,16 +1,14 @@
-import { useListDiscs } from '../api/northlanding'
+import { useGetMyDiscs } from '../api/northlanding'
 
 export function MyDiscsPage() {
-  const { data, isLoading } = useListDiscs()
+  const { data: discs, isLoading } = useGetMyDiscs()
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading…</div>
-
-  const discs = data?.items ?? []
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6 text-green-800">My Discs</h1>
-      {discs.length === 0 ? (
+      {!discs?.length ? (
         <p className="text-gray-500">No discs found matching your linked phone numbers.</p>
       ) : (
         <div className="space-y-4">
@@ -45,9 +43,6 @@ export function MyDiscsPage() {
             </div>
           ))}
         </div>
-      )}
-      {data && data.total > data.page_size && (
-        <p className="mt-4 text-sm text-gray-500">Showing {discs.length} of {data.total} discs.</p>
       )}
     </div>
   )

@@ -201,13 +201,14 @@ export type WishlistDiscCreateName = string | null;
 
 export type WishlistDiscCreateColor = string | null;
 
-export type WishlistDiscCreateNotes = string | null;
+export type WishlistDiscCreateOwnerName = string | null;
 
 export interface WishlistDiscCreate {
   manufacturer?: WishlistDiscCreateManufacturer;
   name?: WishlistDiscCreateName;
   color?: WishlistDiscCreateColor;
-  notes?: WishlistDiscCreateNotes;
+  phone_number: string;
+  owner_name?: WishlistDiscCreateOwnerName;
 }
 
 export type ListDiscsParams = {
@@ -1277,6 +1278,30 @@ export function useGetMyWishlist<TData = Awaited<ReturnType<typeof getMyWishlist
 }
 
 
+
+
+export const getMyDiscs = (signal?: AbortSignal) => {
+  return customInstance<DiscOut[]>({ url: `/users/me/discs`, method: 'GET', signal });
+}
+
+export const getGetMyDiscsQueryKey = () => [`/users/me/discs`] as const;
+
+export const getGetMyDiscsQueryOptions = <TData = Awaited<ReturnType<typeof getMyDiscs>>, TError = ErrorType<unknown>>(options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyDiscs>>, TError, TData>> }) => {
+  const { query: queryOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetMyDiscsQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyDiscs>>> = ({ signal }) => getMyDiscs(signal);
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof getMyDiscs>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> };
+}
+
+export function useGetMyDiscs<TData = Awaited<ReturnType<typeof getMyDiscs>>, TError = ErrorType<unknown>>(
+  options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyDiscs>>, TError, TData>> },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetMyDiscsQueryOptions(options);
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  query.queryKey = queryOptions.queryKey;
+  return query;
+}
 
 
 /**

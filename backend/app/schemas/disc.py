@@ -57,7 +57,8 @@ class WishlistDiscCreate(BaseModel):
     manufacturer: str | None = None
     name: str | None = None
     color: str | None = None
-    notes: str | None = None
+    phone_number: str
+    owner_name: str | None = None
 
 
 class DiscPage(BaseModel):

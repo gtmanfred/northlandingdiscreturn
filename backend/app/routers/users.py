@@ -101,6 +101,20 @@ async def get_my_wishlist(
     return await disc_repo.list_wishlist_by_phones(numbers)
 
 
+@router.get("/me/discs", response_model=list[DiscOut], operation_id="getMyDiscs")
+async def get_my_discs(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    user_repo = UserRepository(db)
+    phones = await user_repo.get_verified_numbers(current_user.id)
+    numbers = [p.number for p in phones]
+    if not numbers:
+        return []
+    disc_repo = DiscRepository(db)
+    return await disc_repo.list_wishlist_by_phones(numbers)
+
+
 @router.post("/me/wishlist", response_model=DiscOut, status_code=201, operation_id="addWishlistDisc")
 async def add_wishlist_disc(
     body: WishlistDiscCreate,
@@ -109,14 +123,19 @@ async def add_wishlist_disc(
 ):
     user_repo = UserRepository(db)
     phones = await user_repo.get_verified_numbers(current_user.id)
-    phone_number = phones[0].number if phones else None
+    verified_numbers = {p.number for p in phones}
+    if not verified_numbers:
+        raise HTTPException(status_code=400, detail="No verified phone number on account")
+    if body.phone_number not in verified_numbers:
+        raise HTTPException(status_code=400, detail="Phone number not verified on your account")
     disc_repo = DiscRepository(db)
     disc = await disc_repo.create(
         manufacturer=body.manufacturer or "Unknown",
         name=body.name or "Unknown",
         color=body.color or "Unknown",
         input_date=date.today(),
-        phone_number=phone_number,
+        phone_number=body.phone_number,
+        owner_name=body.owner_name or current_user.name,
         is_found=False,
     )
     await db.commit()
