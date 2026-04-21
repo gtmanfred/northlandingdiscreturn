@@ -8,6 +8,7 @@ export interface Suggestion {
 interface AutocompleteInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   suggestions: Suggestion[]
   onValueChange: (value: string) => void
+  containerClassName?: string
 }
 
 export function AutocompleteInput({
@@ -15,6 +16,7 @@ export function AutocompleteInput({
   onValueChange,
   value = '',
   className,
+  containerClassName,
   ...props
 }: AutocompleteInputProps) {
   const [open, setOpen] = useState(false)
@@ -65,7 +67,7 @@ export function AutocompleteInput({
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={containerClassName ? `relative ${containerClassName}` : 'relative'}>
       <input
         {...props}
         value={value}

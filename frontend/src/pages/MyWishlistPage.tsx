@@ -43,21 +43,24 @@ export function MyWishlistPage() {
 
       <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-lg p-4 mb-8 flex gap-3 flex-wrap">
         <AutocompleteInput
-          className="border border-gray-300 rounded px-3 py-2 flex-1 min-w-32"
+          containerClassName="flex-1 min-w-32"
+          className="w-full border border-gray-300 rounded px-3 py-2"
           placeholder="Manufacturer"
           value={form.manufacturer}
           suggestions={manufacturerSuggestions.map((v) => ({ value: v }))}
           onValueChange={(v) => setForm((f) => ({ ...f, manufacturer: v }))}
         />
         <AutocompleteInput
-          className="border border-gray-300 rounded px-3 py-2 flex-1 min-w-32"
+          containerClassName="flex-1 min-w-32"
+          className="w-full border border-gray-300 rounded px-3 py-2"
           placeholder="Disc name"
           value={form.name}
           suggestions={nameSuggestions.map((v) => ({ value: v }))}
           onValueChange={(v) => setForm((f) => ({ ...f, name: v }))}
         />
         <AutocompleteInput
-          className="border border-gray-300 rounded px-3 py-2 flex-1 min-w-24"
+          containerClassName="flex-1 min-w-24"
+          className="w-full border border-gray-300 rounded px-3 py-2"
           placeholder="Color"
           value={form.color}
           suggestions={colorSuggestions.map((v) => ({ value: v }))}
