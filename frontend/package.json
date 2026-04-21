@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "generate": "orval",
-    "generate:schema": "cd .. && uv run python scripts/generate-openapi.py && cd frontend"
+    "generate:schema": "cd .. && uv run python scripts/generate-openapi.py",
+    "generate:all": "npm run generate:schema && npm run generate"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.99.2",
