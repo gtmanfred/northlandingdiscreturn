@@ -13,6 +13,7 @@ import {
 import { AutocompleteInput, type Suggestion } from '../components/AutocompleteInput'
 import { PhotoUpload } from '../components/PhotoUpload'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { normalizePhone } from '../utils/phone'
 
 interface DiscFormState {
   manufacturer: string
@@ -101,10 +102,19 @@ export function AdminDiscFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    let normalizedPhone: string | null = null
+    if (form.phone_number) {
+      try {
+        normalizedPhone = normalizePhone(form.phone_number)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Invalid phone number.')
+        return
+      }
+    }
     const payload = {
       ...form,
       owner_name: form.owner_name || null,
-      phone_number: form.phone_number || null,
+      phone_number: normalizedPhone,
     }
     try {
       if (isEdit) {
@@ -175,10 +185,10 @@ export function AdminDiscFormPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number (E.164)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
           <AutocompleteInput
             type="tel"
-            placeholder="+15551234567"
+            placeholder="(555) 123-4567"
             value={form.phone_number}
             suggestions={phoneSuggestions}
             onValueChange={setValue('phone_number')}

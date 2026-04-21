@@ -1,7 +1,8 @@
 # backend/app/schemas/disc.py
 import uuid
 from datetime import datetime, date
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from app.phone import normalize_phone
 
 
 class DiscPhotoOut(BaseModel):
@@ -41,6 +42,11 @@ class DiscCreate(BaseModel):
     is_clear: bool = False
     is_found: bool = True
 
+    @field_validator("phone_number")
+    @classmethod
+    def normalize(cls, v: str | None) -> str | None:
+        return normalize_phone(v) if v else None
+
 
 class DiscUpdate(BaseModel):
     manufacturer: str | None = None
@@ -52,6 +58,11 @@ class DiscUpdate(BaseModel):
     is_found: bool | None = None
     is_returned: bool | None = None
 
+    @field_validator("phone_number")
+    @classmethod
+    def normalize(cls, v: str | None) -> str | None:
+        return normalize_phone(v) if v else None
+
 
 class WishlistDiscCreate(BaseModel):
     manufacturer: str | None = None
@@ -59,6 +70,11 @@ class WishlistDiscCreate(BaseModel):
     color: str | None = None
     phone_number: str
     owner_name: str | None = None
+
+    @field_validator("phone_number")
+    @classmethod
+    def normalize(cls, v: str) -> str:
+        return normalize_phone(v)
 
 
 class DiscPage(BaseModel):

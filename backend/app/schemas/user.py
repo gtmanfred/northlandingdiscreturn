@@ -1,7 +1,8 @@
 # backend/app/schemas/user.py
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from app.phone import normalize_phone
 
 
 class PhoneNumberOut(BaseModel):
@@ -25,12 +26,22 @@ class UserOut(BaseModel):
 
 
 class AddPhoneRequest(BaseModel):
-    number: str  # E.164 e.g. "+15551234567"
+    number: str
+
+    @field_validator("number")
+    @classmethod
+    def normalize(cls, v: str) -> str:
+        return normalize_phone(v)
 
 
 class VerifyPhoneRequest(BaseModel):
     number: str
     code: str
+
+    @field_validator("number")
+    @classmethod
+    def normalize(cls, v: str) -> str:
+        return normalize_phone(v)
 
 
 class UpdateUserRequest(BaseModel):

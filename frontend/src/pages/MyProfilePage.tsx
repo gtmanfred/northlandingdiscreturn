@@ -8,6 +8,7 @@ import {
   getGetMeQueryKey,
 } from '../api/northlanding'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { normalizePhone } from '../utils/phone'
 
 type Step = 'idle' | 'code-sent'
 
@@ -28,13 +29,20 @@ export function MyProfilePage() {
   const handleAddPhone = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    let normalized: string
     try {
-      await addPhone.mutateAsync({ data: { number: newNumber } })
-      setPendingNumber(newNumber)
+      normalized = normalizePhone(newNumber)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid phone number.')
+      return
+    }
+    try {
+      await addPhone.mutateAsync({ data: { number: normalized } })
+      setPendingNumber(normalized)
       setNewNumber('')
       setStep('code-sent')
     } catch {
-      setError('Failed to send verification code. Check the number format (+15551234567).')
+      setError('Failed to send verification code.')
     }
   }
 
@@ -85,21 +93,24 @@ export function MyProfilePage() {
 
       <div className="mt-6">
         {step === 'idle' ? (
-          <form onSubmit={handleAddPhone} className="flex gap-2">
-            <input
-              type="tel"
-              placeholder="+15551234567"
-              value={newNumber}
-              onChange={(e) => setNewNumber(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 flex-1"
-            />
-            <button
-              type="submit"
-              disabled={addPhone.isPending}
-              className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
-            >
-              Add Phone
-            </button>
+          <form onSubmit={handleAddPhone} className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={newNumber}
+                onChange={(e) => setNewNumber(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-2 flex-1"
+              />
+              <button
+                type="submit"
+                disabled={addPhone.isPending}
+                className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
+              >
+                Add Phone
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">US numbers only — any format accepted.</p>
           </form>
         ) : (
           <form onSubmit={handleVerify} className="flex flex-col gap-2">
@@ -107,21 +118,21 @@ export function MyProfilePage() {
               Enter the 6-digit code sent to {pendingNumber}:
             </p>
             <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="123456"
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 flex-1"
-            />
-            <button
-              type="submit"
-              disabled={verifyPhone.isPending}
-              className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
-            >
-              Verify
-            </button>
+              <input
+                type="text"
+                placeholder="123456"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-2 flex-1"
+              />
+              <button
+                type="submit"
+                disabled={verifyPhone.isPending}
+                className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
+              >
+                Verify
+              </button>
             </div>
           </form>
         )}
