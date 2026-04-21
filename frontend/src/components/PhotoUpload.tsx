@@ -23,7 +23,7 @@ export function PhotoUpload({ discId, existingPhotos }: PhotoUploadProps) {
       queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
       setUploading(false)
     },
-    [discId],
+    [discId, queryClient, uploadMutation],
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

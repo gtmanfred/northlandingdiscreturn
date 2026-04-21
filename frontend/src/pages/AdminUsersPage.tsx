@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   useAdminListUsers,
@@ -10,12 +11,18 @@ export function AdminUsersPage() {
   const queryClient = useQueryClient()
   const { data: users, isLoading } = useAdminListUsers()
   const updateMutation = useAdminUpdateUser()
+  const [error, setError] = useState('')
 
   const handlePromote = async (userId: string, name: string, currentAdmin: boolean) => {
     const action = currentAdmin ? 'Remove admin from' : 'Promote'
     if (!confirm(`${action} ${name}?`)) return
-    await updateMutation.mutateAsync({ userId, data: { is_admin: !currentAdmin } })
-    queryClient.invalidateQueries({ queryKey: getAdminListUsersQueryKey() })
+    setError('')
+    try {
+      await updateMutation.mutateAsync({ userId, data: { is_admin: !currentAdmin } })
+      queryClient.invalidateQueries({ queryKey: getAdminListUsersQueryKey() })
+    } catch {
+      setError(`Failed to update ${name}.`)
+    }
   }
 
   if (isLoading) return <LoadingSpinner />
@@ -23,6 +30,8 @@ export function AdminUsersPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6 text-green-800">Users</h1>
+
+      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">

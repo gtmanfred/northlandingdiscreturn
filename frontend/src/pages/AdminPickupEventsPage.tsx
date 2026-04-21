@@ -16,21 +16,32 @@ export function AdminPickupEventsPage() {
 
   const [form, setForm] = useState({ scheduled_date: '', notes: '' })
   const [notifyResult, setNotifyResult] = useState<{ sms_jobs_enqueued: number; discs_notified: number } | null>(null)
+  const [error, setError] = useState('')
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminListPickupEventsQueryKey() })
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    await createMutation.mutateAsync({ data: form })
-    setForm({ scheduled_date: '', notes: '' })
-    refresh()
+    setError('')
+    try {
+      await createMutation.mutateAsync({ data: form })
+      setForm({ scheduled_date: '', notes: '' })
+      refresh()
+    } catch {
+      setError('Failed to create pickup event.')
+    }
   }
 
   const handleNotify = async (eventId: string) => {
     if (!confirm('Send SMS notifications to all disc owners with unreturned discs?')) return
-    const result = await notifyMutation.mutateAsync({ eventId })
-    setNotifyResult(result)
-    refresh()
+    setError('')
+    try {
+      const result = await notifyMutation.mutateAsync({ eventId })
+      setNotifyResult(result)
+      refresh()
+    } catch {
+      setError('Failed to send notifications.')
+    }
   }
 
   if (isLoading) return <LoadingSpinner />
@@ -45,6 +56,7 @@ export function AdminPickupEventsPage() {
           <button onClick={() => setNotifyResult(null)} className="ml-3 text-gray-500 hover:text-gray-700">×</button>
         </div>
       )}
+      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
       <form onSubmit={handleCreate} className="bg-white border border-gray-200 rounded-lg p-4 mb-8 flex gap-3 flex-wrap">
         <div className="flex-1 min-w-40">

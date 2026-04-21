@@ -12,11 +12,17 @@ export function AdminDiscsPage() {
 
   const { data, isLoading } = useListDiscs({ page, page_size: pageSize })
   const deleteMutation = useDeleteDisc()
+  const [error, setError] = useState('')
 
   const handleDelete = async (discId: string, name: string) => {
     if (!confirm(`Delete ${name}?`)) return
-    await deleteMutation.mutateAsync({ discId })
-    queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+    setError('')
+    try {
+      await deleteMutation.mutateAsync({ discId })
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+    } catch {
+      setError(`Failed to delete ${name}.`)
+    }
   }
 
   const discs = data?.items ?? []
@@ -43,6 +49,7 @@ export function AdminDiscsPage() {
         onChange={(e) => setSearch(e.target.value)}
         className="border border-gray-300 rounded px-3 py-2 mb-4 w-full max-w-sm"
       />
+      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">

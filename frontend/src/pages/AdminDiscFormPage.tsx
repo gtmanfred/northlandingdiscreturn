@@ -66,6 +66,7 @@ export function AdminDiscFormPage() {
 
   const createMutation = useCreateDisc()
   const updateMutation = useUpdateDisc()
+  const [error, setError] = useState('')
 
   const set = (field: keyof DiscFormState) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -73,21 +74,29 @@ export function AdminDiscFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     const payload = {
       ...form,
       owner_name: form.owner_name || null,
       phone_number: form.phone_number || null,
     }
-    if (isEdit) {
-      await updateMutation.mutateAsync({ discId, data: payload })
-    } else {
-      await createMutation.mutateAsync({ data: payload })
+    try {
+      if (isEdit) {
+        await updateMutation.mutateAsync({ discId, data: payload })
+      } else {
+        await createMutation.mutateAsync({ data: payload })
+      }
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+      navigate('/admin/discs')
+    } catch {
+      setError(isEdit ? 'Failed to update disc.' : 'Failed to create disc.')
     }
-    queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
-    navigate('/admin/discs')
   }
 
   if (isEdit && isLoading) return <LoadingSpinner />
+  if (isEdit && !isLoading && !existingDisc) return (
+    <div className="p-8 text-center text-red-600">Disc not found.</div>
+  )
 
   const isSaving = createMutation.isPending || updateMutation.isPending
 
@@ -152,6 +161,8 @@ export function AdminDiscFormPage() {
             <PhotoUpload discId={discId!} existingPhotos={existingDisc.photos ?? []} />
           </div>
         )}
+
+        {error && <p className="text-red-600 text-sm">{error}</p>}
 
         <div className="flex gap-3 pt-2">
           <button
