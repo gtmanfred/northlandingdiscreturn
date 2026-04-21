@@ -1,18 +1,52 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useListDiscs, useDeleteDisc, getListDiscsQueryKey } from '../api/northlanding'
+import {
+  useListDiscs,
+  useDeleteDisc,
+  useUpdateDisc,
+  getListDiscsQueryKey,
+} from '../api/northlanding'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function AdminDiscsPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+
+  // Filter state
+  const [isFoundFilter, setIsFoundFilter] = useState<boolean | undefined>(undefined)
+  const [isReturnedFilter, setIsReturnedFilter] = useState<boolean | undefined>(undefined)
+  const [ownerNameInput, setOwnerNameInput] = useState('')
+  const [ownerNameFilter, setOwnerNameFilter] = useState<string | undefined>(undefined)
+
   const pageSize = 25
 
-  const { data, isLoading } = useListDiscs({ page, page_size: pageSize })
+  // Debounce owner name 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setOwnerNameFilter(ownerNameInput || undefined)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [ownerNameInput])
+
+  const { data, isLoading } = useListDiscs({
+    page,
+    page_size: pageSize,
+    is_found: isFoundFilter,      // undefined → omitted from URL query string
+    is_returned: isReturnedFilter,
+    owner_name: ownerNameFilter,
+  })
   const deleteMutation = useDeleteDisc()
+  const updateMutation = useUpdateDisc()
   const [error, setError] = useState('')
+
+  const handleFilterChange = (setter: (v: boolean | undefined) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value
+    setter(val === '' ? undefined : val === 'true')
+    setPage(1)
+  }
 
   const handleDelete = async (discId: string, name: string) => {
     if (!confirm(`Delete ${name}?`)) return
@@ -22,6 +56,24 @@ export function AdminDiscsPage() {
       queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
     } catch {
       setError(`Failed to delete ${name}.`)
+    }
+  }
+
+  const handleToggleIsFound = async (discId: string, current: boolean) => {
+    try {
+      await updateMutation.mutateAsync({ discId, data: { is_found: !current } })
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+    } catch {
+      setError('Failed to update disc.')
+    }
+  }
+
+  const handleToggleIsReturned = async (discId: string, current: boolean) => {
+    try {
+      await updateMutation.mutateAsync({ discId, data: { is_returned: !current } })
+      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+    } catch {
+      setError('Failed to update disc.')
     }
   }
 
@@ -42,13 +94,60 @@ export function AdminDiscsPage() {
         </Link>
       </div>
 
-      <input
-        type="search"
-        placeholder="Filter by name, manufacturer…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="border border-gray-300 rounded px-3 py-2 mb-4 w-full max-w-sm"
-      />
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-3 mb-4 items-end">
+        <div>
+          <label htmlFor="filter-found" className="block text-xs text-gray-500 mb-1">Found</label>
+          <select
+            id="filter-found"
+            aria-label="Found"
+            value={isFoundFilter === undefined ? '' : String(isFoundFilter)}
+            onChange={handleFilterChange(setIsFoundFilter)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+          >
+            <option value="">All</option>
+            <option value="true">Found</option>
+            <option value="false">Not found</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filter-returned" className="block text-xs text-gray-500 mb-1">Returned</label>
+          <select
+            id="filter-returned"
+            aria-label="Returned"
+            value={isReturnedFilter === undefined ? '' : String(isReturnedFilter)}
+            onChange={handleFilterChange(setIsReturnedFilter)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+          >
+            <option value="">All</option>
+            <option value="true">Returned</option>
+            <option value="false">Not returned</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filter-owner" className="block text-xs text-gray-500 mb-1">Owner name</label>
+          <input
+            id="filter-owner"
+            type="text"
+            placeholder="Owner name…"
+            value={ownerNameInput}
+            onChange={(e) => setOwnerNameInput(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm w-48"
+          />
+        </div>
+        <div>
+          <label htmlFor="filter-search" className="block text-xs text-gray-500 mb-1">Name / manufacturer</label>
+          <input
+            id="filter-search"
+            type="search"
+            placeholder="Filter by name, manufacturer…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm w-56"
+          />
+        </div>
+      </div>
+
       {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
 
       <div className="overflow-x-auto">
@@ -60,6 +159,8 @@ export function AdminDiscsPage() {
               <th className="px-3 py-2 border border-gray-200">Color</th>
               <th className="px-3 py-2 border border-gray-200">Phone</th>
               <th className="px-3 py-2 border border-gray-200">Owner</th>
+              <th className="px-3 py-2 border border-gray-200">Found</th>
+              <th className="px-3 py-2 border border-gray-200">Returned</th>
               <th className="px-3 py-2 border border-gray-200">Status</th>
               <th className="px-3 py-2 border border-gray-200">Actions</th>
             </tr>
@@ -88,6 +189,28 @@ export function AdminDiscsPage() {
                   <td className="px-3 py-2 border border-gray-200">{disc.color}</td>
                   <td className="px-3 py-2 border border-gray-200">{disc.phone_number ?? '—'}</td>
                   <td className="px-3 py-2 border border-gray-200">{disc.owner_name ?? '—'}</td>
+                  <td className="px-3 py-2 border border-gray-200">
+                    <button
+                      onClick={() => handleToggleIsFound(disc.id, disc.is_found)}
+                      className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer border-0 ${
+                        disc.is_found
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                      title={disc.is_found ? 'Mark as not found' : 'Mark as found'}
+                    >
+                      {disc.is_found ? 'Found' : 'Not found'}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2 border border-gray-200 text-center">
+                    <input
+                      type="checkbox"
+                      checked={disc.is_returned}
+                      onChange={() => handleToggleIsReturned(disc.id, disc.is_returned)}
+                      aria-label={disc.is_returned ? 'Mark as not returned' : 'Mark as returned'}
+                      className="cursor-pointer"
+                    />
+                  </td>
                   <td className="px-3 py-2 border border-gray-200">
                     {disc.is_returned ? (
                       <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Returned</span>

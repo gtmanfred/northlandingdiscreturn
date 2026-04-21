@@ -205,9 +205,18 @@ export interface WishlistDiscCreate {
   notes?: WishlistDiscCreateNotes;
 }
 
+export type ListDiscsParamsIsFound = boolean | null;
+
+export type ListDiscsParamsIsReturned = boolean | null;
+
+export type ListDiscsParamsOwnerName = string | null;
+
 export type ListDiscsParams = {
 page?: number;
 page_size?: number;
+is_found?: ListDiscsParamsIsFound;
+is_returned?: ListDiscsParamsIsReturned;
+owner_name?: ListDiscsParamsOwnerName;
 };
 
 /**

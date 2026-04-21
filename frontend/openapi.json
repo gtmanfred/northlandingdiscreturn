@@ -94,6 +94,54 @@
               "default": 50,
               "title": "Page Size"
             }
+          },
+          {
+            "name": "is_found",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Found"
+            }
+          },
+          {
+            "name": "is_returned",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Returned"
+            }
+          },
+          {
+            "name": "owner_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Name"
+            }
           }
         ],
         "responses": {

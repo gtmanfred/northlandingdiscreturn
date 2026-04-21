@@ -108,6 +108,60 @@ async def test_list_by_phones(db):
     assert "G" not in names
 
 
+async def test_list_all_is_found_true(db):
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="Found", color="W", input_date=date.today(), is_found=True)
+    await repo.create(manufacturer="X", name="Wishlist", color="W", input_date=date.today(), is_found=False)
+    results = await repo.list_all(is_found=True)
+    assert all(d.is_found is True for d in results)
+    names = [d.name for d in results]
+    assert "Found" in names
+    assert "Wishlist" not in names
+
+
+async def test_list_all_is_found_false(db):
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="Found2", color="W", input_date=date.today(), is_found=True)
+    await repo.create(manufacturer="X", name="Wishlist2", color="W", input_date=date.today(), is_found=False)
+    results = await repo.list_all(is_found=False)
+    assert all(d.is_found is False for d in results)
+    names = [d.name for d in results]
+    assert "Wishlist2" in names
+    assert "Found2" not in names
+
+
+async def test_list_all_owner_name_filter(db):
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="D1", color="W", input_date=date.today(), owner_name="Alice Smith")
+    await repo.create(manufacturer="X", name="D2", color="W", input_date=date.today(), owner_name="Bob Jones")
+    results = await repo.list_all(owner_name="alice")
+    names = [d.name for d in results]
+    assert "D1" in names
+    assert "D2" not in names
+
+
+async def test_list_all_combined_filters(db):
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="Match", color="W", input_date=date.today(), is_found=True, owner_name="Carol")
+    await repo.create(manufacturer="X", name="WrongOwner", color="W", input_date=date.today(), is_found=True, owner_name="Dave")
+    await repo.create(manufacturer="X", name="WrongFound", color="W", input_date=date.today(), is_found=False, owner_name="Carol")
+    results = await repo.list_all(is_found=True, owner_name="carol")
+    names = [d.name for d in results]
+    assert "Match" in names
+    assert "WrongOwner" not in names
+    assert "WrongFound" not in names
+
+
+async def test_count_all_with_is_found_filter(db):
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="F1", color="W", input_date=date.today(), is_found=True)
+    await repo.create(manufacturer="X", name="F2", color="W", input_date=date.today(), is_found=True)
+    await repo.create(manufacturer="X", name="W1", color="W", input_date=date.today(), is_found=False)
+    assert await repo.count_all(is_found=True) == 2
+    assert await repo.count_all(is_found=False) == 1
+    assert await repo.count_all() == 3
+
+
 # --- Endpoint tests ---
 
 def admin_headers(user_id: uuid.UUID) -> dict:
@@ -132,6 +186,50 @@ async def test_create_disc_as_admin(client, db):
     )
     assert resp.status_code == 201
     assert resp.json()["name"] == "Destroyer"
+
+
+async def test_admin_list_discs_is_found_filter(client, db):
+    admin = await make_admin(db, name="Admin4", email="admin4@example.com", google_id="g-admin4")
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="FoundDisc", color="W", input_date=date.today(), is_found=True)
+    await repo.create(manufacturer="X", name="WishlistDisc", color="W", input_date=date.today(), is_found=False)
+    await db.commit()
+
+    resp = await client.get("/discs?is_found=true", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    names = [d["name"] for d in resp.json()["items"]]
+    assert "FoundDisc" in names
+    assert "WishlistDisc" not in names
+
+    resp2 = await client.get("/discs?is_found=false", headers=admin_headers(admin.id))
+    assert resp2.status_code == 200
+    names2 = [d["name"] for d in resp2.json()["items"]]
+    assert "WishlistDisc" in names2
+    assert "FoundDisc" not in names2
+
+
+async def test_admin_list_discs_owner_name_filter(client, db):
+    admin = await make_admin(db, name="Admin5", email="admin5@example.com", google_id="g-admin5")
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="AliceDisc", color="W", input_date=date.today(), owner_name="Alice")
+    await repo.create(manufacturer="X", name="BobDisc", color="W", input_date=date.today(), owner_name="Bob")
+    await db.commit()
+
+    resp = await client.get("/discs?owner_name=alice", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    names = [d["name"] for d in resp.json()["items"]]
+    assert "AliceDisc" in names
+    assert "BobDisc" not in names
+
+
+async def test_non_admin_ignores_filter_params(client, db):
+    user_repo = UserRepository(db)
+    user = await user_repo.create(name="Regular2", email="reg2@example.com", google_id="g-reg2")
+    await db.commit()
+
+    # Non-admin with is_found filter — should 200 (params silently ignored, returns their discs)
+    resp = await client.get("/discs?is_found=false", headers=admin_headers(user.id))
+    assert resp.status_code == 200
 
 
 async def test_create_disc_non_admin_forbidden(client, db):

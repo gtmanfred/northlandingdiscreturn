@@ -2,7 +2,7 @@
 import asyncio
 import uuid
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user, require_admin
@@ -21,11 +21,24 @@ async def list_discs(
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = 1,
     page_size: int = 50,
+    is_found: bool | None = Query(default=None),
+    is_returned: bool | None = Query(default=None),
+    owner_name: str | None = Query(default=None),
 ):
     repo = DiscRepository(db)
     if current_user.is_admin:
-        discs = await repo.list_all(page=page, page_size=page_size)
-        total = await repo.count_all()
+        discs = await repo.list_all(
+            page=page,
+            page_size=page_size,
+            is_found=is_found,
+            is_returned=is_returned,
+            owner_name=owner_name,
+        )
+        total = await repo.count_all(
+            is_found=is_found,
+            is_returned=is_returned,
+            owner_name=owner_name,
+        )
     else:
         user_repo = UserRepository(db)
         phones = await user_repo.get_verified_numbers(current_user.id)
