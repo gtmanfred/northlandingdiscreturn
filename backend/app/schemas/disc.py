@@ -1,8 +1,9 @@
 # backend/app/schemas/disc.py
 import uuid
 from datetime import datetime, date
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from app.phone import normalize_phone
+from app.services.storage import storage_path_to_url
 
 
 class DiscPhotoOut(BaseModel):
@@ -11,6 +12,11 @@ class DiscPhotoOut(BaseModel):
     sort_order: int
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def normalize_photo_path(self) -> "DiscPhotoOut":
+        self.photo_path = storage_path_to_url(self.photo_path)
+        return self
 
 
 class DiscOut(BaseModel):

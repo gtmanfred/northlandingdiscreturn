@@ -10,8 +10,8 @@ from app.models.user import User
 from app.repositories.disc import DiscRepository
 from app.repositories.user import UserRepository
 from app.schemas.disc import DiscOut, DiscCreate, DiscUpdate, DiscPage, DiscPhotoOut
-from app.services.storage import upload_photo, delete_photo, get_public_url
 from app.config import settings
+from app.services.storage import upload_photo, delete_photo, storage_path_to_url
 
 router = APIRouter()
 
@@ -118,8 +118,7 @@ async def upload_disc_photo(
     path = f"discs/{disc_id}/{uuid.uuid4()}.{ext}"
     sort_order = len(disc.photos)
     await asyncio.to_thread(upload_photo, file_bytes, path, file.content_type or "image/jpeg")
-    public_url = await asyncio.to_thread(get_public_url, path)
-    photo = await repo.add_photo(disc_id, public_url, sort_order)
+    photo = await repo.add_photo(disc_id, storage_path_to_url(path), sort_order)
     await db.commit()
     return photo
 
@@ -135,7 +134,6 @@ async def delete_disc_photo(
     stored = await repo.delete_photo(photo_id)
     if stored is None:
         raise HTTPException(status_code=404, detail="Photo not found")
-    # stored may be a full public URL or a relative path; extract relative path
     marker = f"/{settings.SUPABASE_BUCKET}/"
     storage_path = stored.split(marker, 1)[-1] if marker in stored else stored
     await asyncio.to_thread(delete_photo, storage_path)

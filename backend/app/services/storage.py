@@ -12,6 +12,18 @@ def get_storage_client() -> Client:
     return _client
 
 
+def storage_path_to_url(path: str) -> str:
+    """Convert a bucket-relative storage path to a full public URL.
+
+    Also accepts an already-absolute URL and returns it unchanged, so this
+    is safe to call on both old (relative) and new (absolute) photo_path values.
+    """
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    base = settings.SUPABASE_URL.rstrip("/")
+    return f"{base}/storage/v1/object/public/{settings.SUPABASE_BUCKET}/{path}"
+
+
 def upload_photo(file_bytes: bytes, path: str, content_type: str = "image/jpeg") -> str:
     client = get_storage_client()
     client.storage.from_(settings.SUPABASE_BUCKET).upload(
@@ -23,8 +35,3 @@ def upload_photo(file_bytes: bytes, path: str, content_type: str = "image/jpeg")
 def delete_photo(path: str) -> None:
     client = get_storage_client()
     client.storage.from_(settings.SUPABASE_BUCKET).remove([path])
-
-
-def get_public_url(path: str) -> str:
-    client = get_storage_client()
-    return client.storage.from_(settings.SUPABASE_BUCKET).get_public_url(path)
