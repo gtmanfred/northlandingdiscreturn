@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -57,6 +57,15 @@ export function AdminDiscFormPage() {
   const [stagedPhotos, setStagedPhotos] = useState<File[]>([])
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const stagedPreviews = useMemo(
+    () => stagedPhotos.map((f) => URL.createObjectURL(f)),
+    [stagedPhotos],
+  )
+
+  useEffect(() => {
+    return () => stagedPreviews.forEach((url) => URL.revokeObjectURL(url))
+  }, [stagedPreviews])
 
   const { data: manufacturerSuggestions = [] } = useGetSuggestions({ field: 'manufacturer' })
   const { data: nameSuggestions = [] } = useGetSuggestions({ field: 'name' })
@@ -131,9 +140,26 @@ export function AdminDiscFormPage() {
         await updateMutation.mutateAsync({ discId, data: payload })
       } else {
         const created = await createMutation.mutateAsync({ data: payload })
+        let photoError = false
         for (const file of stagedPhotos) {
-          await uploadMutation.mutateAsync({ discId: created.id, data: { file } })
+          try {
+            await uploadMutation.mutateAsync({ discId: created.id, data: { file } })
+          } catch {
+            photoError = true
+          }
         }
+        queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetSuggestionsQueryKey() })
+        if (andAddAnother) {
+          setForm({ ...defaultForm, input_date: new Date().toISOString().slice(0, 10) })
+          setStagedPhotos([])
+        } else {
+          navigate('/admin/discs')
+        }
+        if (photoError) {
+          setError('Disc saved, but one or more photos failed to upload.')
+        }
+        return
       }
       queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
       queryClient.invalidateQueries({ queryKey: getGetSuggestionsQueryKey() })
@@ -257,7 +283,7 @@ export function AdminDiscFormPage() {
                 {stagedPhotos.map((file, i) => (
                   <div key={i} className="relative group w-20 h-20">
                     <img
-                      src={URL.createObjectURL(file)}
+                      src={stagedPreviews[i]}
                       alt=""
                       className="w-20 h-20 object-cover rounded"
                     />
