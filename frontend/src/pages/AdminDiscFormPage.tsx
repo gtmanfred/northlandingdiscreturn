@@ -274,7 +274,7 @@ export function AdminDiscFormPage() {
             {/* Staged photo thumbnails */}
             {stagedPhotos.length > 0 && (
               <div className="flex gap-2 mb-3 flex-wrap">
-                {stagedPhotos.map((file, i) => (
+                {stagedPhotos.map((_file, i) => (
                   <div key={i} className="relative group w-20 h-20">
                     <img
                       src={stagedPreviews[i]}
