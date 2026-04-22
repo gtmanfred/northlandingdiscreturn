@@ -26,7 +26,7 @@ export function PhotoUpload({ discId, existingPhotos }: PhotoUploadProps) {
     [discId, queryClient, uploadMutation],
   )
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
     multiple: true,
@@ -39,6 +39,7 @@ export function PhotoUpload({ discId, existingPhotos }: PhotoUploadProps) {
 
   return (
     <div>
+      {/* Thumbnails */}
       <div className="flex gap-2 mb-3 flex-wrap">
         {existingPhotos.map((photo) => (
           <div key={photo.id} className="relative group w-20 h-20">
@@ -53,13 +54,26 @@ export function PhotoUpload({ discId, existingPhotos }: PhotoUploadProps) {
         ))}
       </div>
 
+      {/* Shared hidden file input */}
+      <input {...getInputProps()} />
+
+      {/* Mobile: tap button */}
+      <button
+        type="button"
+        onClick={open}
+        disabled={uploading}
+        className="md:hidden w-full py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-sm disabled:opacity-50"
+      >
+        {uploading ? 'Uploading…' : '+ Add Photos'}
+      </button>
+
+      {/* Desktop: drag zone */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+        className={`hidden md:block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
           isDragActive ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-gray-400'
         }`}
       >
-        <input {...getInputProps()} />
         {uploading ? (
           <p className="text-gray-500">Uploading…</p>
         ) : isDragActive ? (
