@@ -45,6 +45,64 @@ async def test_get_by_refresh_token_returns_none_for_unknown(db):
     assert result is None
 
 
+async def test_refresh_returns_new_access_token(client, db):
+    from app.repositories.user import UserRepository
+    from app.services.auth import create_refresh_token
+    repo = UserRepository(db)
+    user = await repo.create(name="Refresher", email="refresher@example.com", google_id="g-refresher")
+    token_value = create_refresh_token()
+    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    await repo.update(user, refresh_token=token_value, refresh_token_expires_at=expires)
+    await db.commit()
+
+    response = await client.post("/auth/refresh", cookies={"refresh_token": token_value})
+    assert response.status_code == 200
+    data = response.json()
+    assert "token" in data
+    assert isinstance(data["token"], str)
+
+
+async def test_refresh_rotates_token(client, db):
+    from app.repositories.user import UserRepository
+    from app.services.auth import create_refresh_token
+    repo = UserRepository(db)
+    user = await repo.create(name="Rotator", email="rotator@example.com", google_id="g-rotator")
+    original = create_refresh_token()
+    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    await repo.update(user, refresh_token=original, refresh_token_expires_at=expires)
+    await db.commit()
+
+    response = await client.post("/auth/refresh", cookies={"refresh_token": original})
+    assert response.status_code == 200
+
+    response2 = await client.post("/auth/refresh", cookies={"refresh_token": original})
+    assert response2.status_code == 401
+
+
+async def test_refresh_returns_401_for_unknown_token(client):
+    response = await client.post("/auth/refresh", cookies={"refresh_token": "bad-token"})
+    assert response.status_code == 401
+
+
+async def test_refresh_returns_401_for_expired_token(client, db):
+    from app.repositories.user import UserRepository
+    from app.services.auth import create_refresh_token
+    repo = UserRepository(db)
+    user = await repo.create(name="Expiry", email="expiry@example.com", google_id="g-expiry")
+    token_value = create_refresh_token()
+    expires = datetime.now(timezone.utc) - timedelta(days=1)
+    await repo.update(user, refresh_token=token_value, refresh_token_expires_at=expires)
+    await db.commit()
+
+    response = await client.post("/auth/refresh", cookies={"refresh_token": token_value})
+    assert response.status_code == 401
+
+
+async def test_refresh_returns_401_when_cookie_missing(client):
+    response = await client.post("/auth/refresh")
+    assert response.status_code == 401
+
+
 async def test_create_and_decode_token():
     token = create_access_token("user-123")
     payload = decode_access_token(token)
