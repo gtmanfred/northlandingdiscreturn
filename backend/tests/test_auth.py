@@ -1,8 +1,18 @@
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 from app.repositories.user import UserRepository
 from app.routers.auth import _maybe_promote_to_admin
 from app.services.auth import create_access_token, decode_access_token
+
+
+def test_user_model_has_refresh_token_columns():
+    from sqlalchemy import inspect
+    from app.models.user import User
+    mapper = inspect(User)
+    cols = {c.key for c in mapper.attrs}
+    assert "refresh_token" in cols
+    assert "refresh_token_expires_at" in cols
 
 
 async def test_create_and_decode_token():

@@ -20,6 +20,7 @@ class Config(metaclass=figenv.MetaConfig):
     SUPABASE_BUCKET = "disc-photos"
     JWT_ALGORITHM = "HS256"
     JWT_EXPIRE_MINUTES = 60
+    REFRESH_TOKEN_EXPIRE_DAYS = 30
     FRONTEND_URL = "http://localhost:5173"
     ADMIN_EMAILS: csv = ""  # coerced to [] when unset
 
