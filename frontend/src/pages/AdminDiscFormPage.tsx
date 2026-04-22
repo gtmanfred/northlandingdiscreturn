@@ -138,6 +138,9 @@ export function AdminDiscFormPage() {
     try {
       if (isEdit) {
         await updateMutation.mutateAsync({ discId, data: payload })
+        queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetSuggestionsQueryKey() })
+        navigate('/admin/discs')
       } else {
         const created = await createMutation.mutateAsync({ data: payload })
         let photoError = false
@@ -159,15 +162,6 @@ export function AdminDiscFormPage() {
         if (photoError) {
           setError('Disc saved, but one or more photos failed to upload.')
         }
-        return
-      }
-      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
-      queryClient.invalidateQueries({ queryKey: getGetSuggestionsQueryKey() })
-      if (andAddAnother) {
-        setForm({ ...defaultForm, input_date: new Date().toISOString().slice(0, 10) })
-        setStagedPhotos([])
-      } else {
-        navigate('/admin/discs')
       }
     } catch {
       setError(isEdit ? 'Failed to update disc.' : 'Failed to create disc.')
