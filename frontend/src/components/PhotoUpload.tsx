@@ -17,11 +17,14 @@ export function PhotoUpload({ discId, existingPhotos }: PhotoUploadProps) {
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       setUploading(true)
-      for (const file of acceptedFiles) {
-        await uploadMutation.mutateAsync({ discId, data: { file } })
+      try {
+        for (const file of acceptedFiles) {
+          await uploadMutation.mutateAsync({ discId, data: { file } })
+        }
+        queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+      } finally {
+        setUploading(false)
       }
-      queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
-      setUploading(false)
     },
     [discId, queryClient, uploadMutation],
   )
