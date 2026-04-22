@@ -19,6 +19,10 @@ def generate_verification_code() -> str:
     return str(secrets.randbelow(900000) + 100000)
 
 
+def create_refresh_token() -> str:
+    return secrets.token_hex(32)
+
+
 def send_verification_sms(to_number: str, code: str) -> None:
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
     client.messages.create(

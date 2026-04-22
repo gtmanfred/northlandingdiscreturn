@@ -15,6 +15,8 @@ class User(Base):
     google_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    refresh_token: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    refresh_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     phone_numbers: Mapped[list["PhoneNumber"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

@@ -7,8 +7,10 @@ interface Props {
 }
 
 export function ProtectedRoute({ requireAdmin = false }: Props) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isInitializing } = useAuth()
   const location = useLocation()
+
+  if (isInitializing) return <div className="p-8 text-center">Loading…</div>
 
   if (!isAuthenticated) {
     return <Navigate to="/" state={{ from: location }} replace />

@@ -5,7 +5,13 @@ import App from './App'
 import './index.css'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  defaultOptions: {
+    queries: {
+      retry: (_, error) =>
+        (error as { response?: { status?: number } })?.response?.status !== 401,
+      staleTime: 30_000,
+    },
+  },
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
