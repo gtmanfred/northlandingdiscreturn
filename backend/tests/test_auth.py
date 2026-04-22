@@ -15,6 +15,18 @@ def test_user_model_has_refresh_token_columns():
     assert "refresh_token_expires_at" in cols
 
 
+def test_create_refresh_token_returns_64_char_hex():
+    from app.services.auth import create_refresh_token
+    token = create_refresh_token()
+    assert len(token) == 64
+    assert all(c in "0123456789abcdef" for c in token)
+
+
+def test_create_refresh_token_is_unique():
+    from app.services.auth import create_refresh_token
+    assert create_refresh_token() != create_refresh_token()
+
+
 async def test_create_and_decode_token():
     token = create_access_token("user-123")
     payload = decode_access_token(token)
