@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   useCreateDisc,
   useUpdateDisc,
+  useUploadDiscPhoto,
   useListDiscs,
   useGetSuggestions,
   useGetPhoneSuggestions,
@@ -53,6 +54,9 @@ export function AdminDiscFormPage() {
   const existingDisc = listData?.items.find((d) => d.id === discId)
 
   const [form, setForm] = useState<DiscFormState>(defaultForm)
+  const [stagedPhotos, setStagedPhotos] = useState<File[]>([])
+  const [error, setError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: manufacturerSuggestions = [] } = useGetSuggestions({ field: 'manufacturer' })
   const { data: nameSuggestions = [] } = useGetSuggestions({ field: 'name' })
@@ -88,7 +92,7 @@ export function AdminDiscFormPage() {
 
   const createMutation = useCreateDisc()
   const updateMutation = useUpdateDisc()
-  const [error, setError] = useState('')
+  const uploadMutation = useUploadDiscPhoto()
 
   const set = (field: keyof DiscFormState) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -100,8 +104,13 @@ export function AdminDiscFormPage() {
   const handleOwnerNameChange = (value: string) =>
     setForm((f) => ({ ...f, owner_name: value, phone_number: '' }))
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    setStagedPhotos((prev) => [...prev, ...files])
+    e.target.value = ''
+  }
+
+  const submitForm = async (andAddAnother: boolean) => {
     setError('')
     let normalizedPhone: string | null = null
     if (form.phone_number) {
@@ -121,14 +130,27 @@ export function AdminDiscFormPage() {
       if (isEdit) {
         await updateMutation.mutateAsync({ discId, data: payload })
       } else {
-        await createMutation.mutateAsync({ data: payload })
+        const created = await createMutation.mutateAsync({ data: payload })
+        for (const file of stagedPhotos) {
+          await uploadMutation.mutateAsync({ discId: created.id, data: { file } })
+        }
       }
       queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
       queryClient.invalidateQueries({ queryKey: getGetSuggestionsQueryKey() })
-      navigate('/admin/discs')
+      if (andAddAnother) {
+        setForm({ ...defaultForm, input_date: new Date().toISOString().slice(0, 10) })
+        setStagedPhotos([])
+      } else {
+        navigate('/admin/discs')
+      }
     } catch {
       setError(isEdit ? 'Failed to update disc.' : 'Failed to create disc.')
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await submitForm(false)
   }
 
   if (isEdit && isLoading) return <LoadingSpinner />
@@ -136,7 +158,9 @@ export function AdminDiscFormPage() {
     <div className="p-8 text-center text-red-600">Disc not found.</div>
   )
 
-  const isSaving = createMutation.isPending || updateMutation.isPending
+  const isSaving = createMutation.isPending || updateMutation.isPending || uploadMutation.isPending
+
+  const inputClass = 'w-full border border-gray-300 rounded px-3 py-3 text-base'
 
   return (
     <div className="max-w-lg">
@@ -153,7 +177,7 @@ export function AdminDiscFormPage() {
           ] as const
         ).map(({ field, suggestions }) => (
           <div key={field}>
-            <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
               {field} *
             </label>
             <AutocompleteInput
@@ -161,32 +185,40 @@ export function AdminDiscFormPage() {
               value={form[field]}
               suggestions={suggestions.map((v) => ({ value: v }))}
               onValueChange={setValue(field)}
+              className={inputClass}
             />
           </div>
         ))}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Input Date *</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
+            Input Date *
+          </label>
           <input
             type="date"
             required
             value={form.input_date}
             onChange={set('input_date')}
-            className="w-full border border-gray-300 rounded px-3 py-2"
+            className={inputClass}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
+            Owner Name
+          </label>
           <AutocompleteInput
             value={form.owner_name}
             suggestions={ownerNameSuggestions.map((v) => ({ value: v }))}
             onValueChange={handleOwnerNameChange}
+            className={inputClass}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
+            Phone Number
+          </label>
           {phoneSuggestions.length > 0 ? (
             <AutocompleteInput
               type="tel"
@@ -194,42 +226,94 @@ export function AdminDiscFormPage() {
               value={form.phone_number}
               suggestions={phoneSuggestions}
               onValueChange={setValue('phone_number')}
+              className={inputClass}
             />
           ) : (
             <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
           )}
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex gap-6 py-1">
           {(['is_clear', 'is_found', 'is_returned'] as const).map((field) => (
             <label key={field} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form[field]} onChange={set(field)} className="rounded" />
+              <input type="checkbox" checked={form[field]} onChange={set(field)} className="rounded w-5 h-5" />
               {field.replace('is_', '').replace('_', ' ')}
             </label>
           ))}
         </div>
 
-        {isEdit && existingDisc && (
+        {/* Photos */}
+        {isEdit && existingDisc ? (
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Photos</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">Photos</p>
             <PhotoUpload discId={discId!} existingPhotos={existingDisc.photos ?? []} />
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">Photos</p>
+            {/* Staged photo thumbnails */}
+            {stagedPhotos.length > 0 && (
+              <div className="flex gap-2 mb-3 flex-wrap">
+                {stagedPhotos.map((file, i) => (
+                  <div key={i} className="relative group w-20 h-20">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt=""
+                      className="w-20 h-20 object-cover rounded"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setStagedPhotos((p) => p.filter((_, j) => j !== i))}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handlePhotoSelect}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-sm hover:border-gray-400"
+            >
+              + Add Photos
+            </button>
           </div>
         )}
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
             type="submit"
             disabled={isSaving}
-            className="bg-green-700 text-white px-6 py-2 rounded hover:bg-green-800 disabled:opacity-50"
+            className="bg-green-700 text-white px-6 py-3 rounded hover:bg-green-800 disabled:opacity-50 text-base font-medium"
           >
             {isSaving ? 'Saving…' : isEdit ? 'Update' : 'Create'}
           </button>
+          {!isEdit && (
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => submitForm(true)}
+              className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 disabled:opacity-50 text-base font-medium"
+            >
+              Save and Add Another
+            </button>
+          )}
           <button
             type="button"
             onClick={() => navigate('/admin/discs')}
-            className="px-6 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            className="px-6 py-3 border border-gray-300 rounded hover:bg-gray-50 text-base"
           >
             Cancel
           </button>
