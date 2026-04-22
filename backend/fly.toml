@@ -13,7 +13,7 @@ primary_region = 'ord'
   release_command = 'uv run alembic upgrade head'
 
 [env]
-  FRONTEND_URL = 'https://gtmanfred.github.io/northlandingdiscreturn'
+  FRONTEND_URL = 'https://discreturn.nl'
   SUPABASE_BUCKET = 'disc-photos'
 
 [http_service]
