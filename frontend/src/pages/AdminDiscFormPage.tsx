@@ -229,7 +229,7 @@ export function AdminDiscFormPage() {
               className={inputClass}
             />
           ) : (
-            <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
+            <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} className="py-3" />
           )}
         </div>
 

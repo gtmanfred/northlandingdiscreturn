@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 vi.mock('../api/northlanding', () => ({
   useCreateDisc: () => ({ mutateAsync: vi.fn().mockResolvedValue({ id: 'new-disc-id' }), isPending: false }),
   useUpdateDisc: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUploadDiscPhoto: () => ({ mutateAsync: vi.fn() }),
+  useUploadDiscPhoto: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useListDiscs: () => ({ data: undefined, isLoading: false }),
   useGetSuggestions: () => ({ data: [] }),
   useGetPhoneSuggestions: () => ({ data: [] }),
