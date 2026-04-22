@@ -82,6 +82,12 @@ export function AdminDiscsPage() {
 
   if (isLoading) return <LoadingSpinner />
 
+  const filteredDiscs = discs.filter((d) =>
+    !search ||
+    d.name.toLowerCase().includes(search.toLowerCase()) ||
+    d.manufacturer.toLowerCase().includes(search.toLowerCase()),
+  )
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -150,7 +156,78 @@ export function AdminDiscsPage() {
 
       {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
 
-      <div className="overflow-x-auto">
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {filteredDiscs.map((disc) => (
+          <div key={disc.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+            <div className="flex gap-3">
+              {disc.photos?.[0] ? (
+                <img
+                  src={disc.photos[0].photo_path}
+                  alt=""
+                  className="w-16 h-16 object-cover rounded flex-shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center text-gray-400 text-xs text-center">
+                  No photo
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900">{disc.name}</p>
+                <p className="text-sm text-gray-500">{disc.manufacturer}</p>
+                <p className="text-sm text-gray-600">{disc.color}</p>
+                {disc.owner_name && <p className="text-sm text-gray-700">{disc.owner_name}</p>}
+                {disc.phone_number && <p className="text-sm text-gray-500">{disc.phone_number}</p>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              {disc.is_returned ? (
+                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Returned</span>
+              ) : disc.final_notice_sent ? (
+                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Final notice</span>
+              ) : (
+                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">Holding</span>
+              )}
+              <button
+                onClick={() => handleToggleIsFound(disc.id, disc.is_found)}
+                className={`px-2 py-0.5 rounded text-xs font-medium border-0 ${
+                  disc.is_found
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {disc.is_found ? 'Found' : 'Not found'}
+              </button>
+              <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={disc.is_returned}
+                  onChange={() => handleToggleIsReturned(disc.id, disc.is_returned)}
+                  aria-label={disc.is_returned ? 'Mark as not returned' : 'Mark as returned'}
+                />
+                Returned
+              </label>
+              <div className="flex gap-3 ml-auto">
+                <Link to={`/admin/discs/${disc.id}/edit`} className="text-blue-600 text-sm hover:underline">
+                  Edit
+                </Link>
+                <button
+                  onClick={() => handleDelete(disc.id, disc.name)}
+                  className="text-red-500 text-sm hover:text-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {filteredDiscs.length === 0 && (
+          <p className="text-gray-500 text-sm py-4 text-center">No discs found.</p>
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-gray-100 text-left">
@@ -166,76 +243,70 @@ export function AdminDiscsPage() {
             </tr>
           </thead>
           <tbody>
-            {discs
-              .filter((d) =>
-                !search ||
-                d.name.toLowerCase().includes(search.toLowerCase()) ||
-                d.manufacturer.toLowerCase().includes(search.toLowerCase()),
-              )
-              .map((disc) => (
-                <tr key={disc.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-3 py-2 border border-gray-200">
-                    {disc.photos?.[0] ? (
-                      <img src={disc.photos[0].photo_path} alt="" className="w-10 h-10 object-cover rounded" />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No photo</div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 border border-gray-200">
-                    <span className="font-medium">{disc.name}</span>
-                    <br />
-                    <span className="text-gray-500">{disc.manufacturer}</span>
-                  </td>
-                  <td className="px-3 py-2 border border-gray-200">{disc.color}</td>
-                  <td className="px-3 py-2 border border-gray-200">{disc.phone_number ?? '—'}</td>
-                  <td className="px-3 py-2 border border-gray-200">{disc.owner_name ?? '—'}</td>
-                  <td className="px-3 py-2 border border-gray-200">
-                    <button
-                      onClick={() => handleToggleIsFound(disc.id, disc.is_found)}
-                      className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer border-0 ${
-                        disc.is_found
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                      title={disc.is_found ? 'Mark as not found' : 'Mark as found'}
-                    >
-                      {disc.is_found ? 'Found' : 'Not found'}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2 border border-gray-200 text-center">
-                    <input
-                      type="checkbox"
-                      checked={disc.is_returned}
-                      onChange={() => handleToggleIsReturned(disc.id, disc.is_returned)}
-                      aria-label={disc.is_returned ? 'Mark as not returned' : 'Mark as returned'}
-                      className="cursor-pointer"
-                    />
-                  </td>
-                  <td className="px-3 py-2 border border-gray-200">
-                    {disc.is_returned ? (
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Returned</span>
-                    ) : disc.final_notice_sent ? (
-                      <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Final notice</span>
-                    ) : (
-                      <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">Holding</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 border border-gray-200 whitespace-nowrap">
-                    <Link
-                      to={`/admin/discs/${disc.id}/edit`}
-                      className="text-blue-600 hover:underline mr-3"
-                    >
-                      Edit
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(disc.id, disc.name)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+            {filteredDiscs.map((disc) => (
+              <tr key={disc.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="px-3 py-2 border border-gray-200">
+                  {disc.photos?.[0] ? (
+                    <img src={disc.photos[0].photo_path} alt="" className="w-10 h-10 object-cover rounded" />
+                  ) : (
+                    <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No photo</div>
+                  )}
+                </td>
+                <td className="px-3 py-2 border border-gray-200">
+                  <span className="font-medium">{disc.name}</span>
+                  <br />
+                  <span className="text-gray-500">{disc.manufacturer}</span>
+                </td>
+                <td className="px-3 py-2 border border-gray-200">{disc.color}</td>
+                <td className="px-3 py-2 border border-gray-200">{disc.phone_number ?? '—'}</td>
+                <td className="px-3 py-2 border border-gray-200">{disc.owner_name ?? '—'}</td>
+                <td className="px-3 py-2 border border-gray-200">
+                  <button
+                    onClick={() => handleToggleIsFound(disc.id, disc.is_found)}
+                    className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer border-0 ${
+                      disc.is_found
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                    title={disc.is_found ? 'Mark as not found' : 'Mark as found'}
+                  >
+                    {disc.is_found ? 'Found' : 'Not found'}
+                  </button>
+                </td>
+                <td className="px-3 py-2 border border-gray-200 text-center">
+                  <input
+                    type="checkbox"
+                    checked={disc.is_returned}
+                    onChange={() => handleToggleIsReturned(disc.id, disc.is_returned)}
+                    aria-label={disc.is_returned ? 'Mark as not returned' : 'Mark as returned'}
+                    className="cursor-pointer"
+                  />
+                </td>
+                <td className="px-3 py-2 border border-gray-200">
+                  {disc.is_returned ? (
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Returned</span>
+                  ) : disc.final_notice_sent ? (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Final notice</span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">Holding</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 border border-gray-200 whitespace-nowrap">
+                  <Link
+                    to={`/admin/discs/${disc.id}/edit`}
+                    className="text-blue-600 hover:underline mr-3"
+                  >
+                    Edit
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(disc.id, disc.name)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
