@@ -27,6 +27,24 @@ def test_create_refresh_token_is_unique():
     assert create_refresh_token() != create_refresh_token()
 
 
+async def test_get_by_refresh_token_returns_user(db):
+    from app.repositories.user import UserRepository
+    repo = UserRepository(db)
+    user = await repo.create(name="RefTest", email="reftest@example.com", google_id="g-reftest")
+    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    await repo.update(user, refresh_token="abc123token", refresh_token_expires_at=expires)
+    found = await repo.get_by_refresh_token("abc123token")
+    assert found is not None
+    assert found.id == user.id
+
+
+async def test_get_by_refresh_token_returns_none_for_unknown(db):
+    from app.repositories.user import UserRepository
+    repo = UserRepository(db)
+    result = await repo.get_by_refresh_token("nonexistent-token")
+    assert result is None
+
+
 async def test_create_and_decode_token():
     token = create_access_token("user-123")
     payload = decode_access_token(token)

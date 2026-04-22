@@ -30,6 +30,10 @@ class UserRepository:
         result = await self.db.execute(select(User).where(User.google_id == google_id))
         return result.scalar_one_or_none()
 
+    async def get_by_refresh_token(self, refresh_token: str) -> User | None:
+        result = await self.db.execute(select(User).where(User.refresh_token == refresh_token))
+        return result.scalar_one_or_none()
+
     async def get_by_emails(self, emails: list[str]) -> list[User]:
         if not emails:
             return []
