@@ -103,6 +103,30 @@ async def test_refresh_returns_401_when_cookie_missing(client):
     assert response.status_code == 401
 
 
+async def test_logout_clears_refresh_token_in_db(client, db):
+    from app.repositories.user import UserRepository
+    from app.services.auth import create_refresh_token
+    repo = UserRepository(db)
+    user = await repo.create(name="LogoutUser", email="logoutuser@example.com", google_id="g-logout")
+    token_value = create_refresh_token()
+    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    await repo.update(user, refresh_token=token_value, refresh_token_expires_at=expires)
+    await db.commit()
+
+    response = await client.post("/auth/logout", cookies={"refresh_token": token_value})
+    assert response.status_code == 200
+
+    await db.refresh(user)
+    assert user.refresh_token is None
+    assert user.refresh_token_expires_at is None
+
+
+async def test_logout_without_cookie_returns_200(client):
+    response = await client.post("/auth/logout")
+    assert response.status_code == 200
+    assert response.json() == {"message": "logged out"}
+
+
 async def test_create_and_decode_token():
     token = create_access_token("user-123")
     payload = decode_access_token(token)
