@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useGetMe } from '../api/northlanding'
@@ -8,6 +8,15 @@ export function Navbar() {
   const { data: user } = useGetMe({ query: { enabled: isAuthenticated } })
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const hamburgerRef = useRef<HTMLButtonElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [drawerOpen])
 
   const handleLogout = () => {
     logout()
@@ -15,18 +24,21 @@ export function Navbar() {
     setDrawerOpen(false)
   }
 
-  const close = () => setDrawerOpen(false)
+  const close = () => {
+    setDrawerOpen(false)
+    setTimeout(() => hamburgerRef.current?.focus(), 0)
+  }
 
   const navLinks = isAuthenticated ? (
     <>
-      <Link to="/my/discs" onClick={close} className="hover:underline block">My Discs</Link>
-      <Link to="/my/wishlist" onClick={close} className="hover:underline block">Wishlist</Link>
-      <Link to="/my/profile" onClick={close} className="hover:underline block">Profile</Link>
+      <Link to="/my/discs" onClick={close} className="hover:underline">My Discs</Link>
+      <Link to="/my/wishlist" onClick={close} className="hover:underline">Wishlist</Link>
+      <Link to="/my/profile" onClick={close} className="hover:underline">Profile</Link>
       {user?.is_admin && (
         <>
-          <Link to="/admin/discs" onClick={close} className="hover:underline block">Admin: Discs</Link>
-          <Link to="/admin/pickup-events" onClick={close} className="hover:underline block">Pickup Events</Link>
-          <Link to="/admin/users" onClick={close} className="hover:underline block">Users</Link>
+          <Link to="/admin/discs" onClick={close} className="hover:underline">Admin: Discs</Link>
+          <Link to="/admin/pickup-events" onClick={close} className="hover:underline">Pickup Events</Link>
+          <Link to="/admin/users" onClick={close} className="hover:underline">Users</Link>
         </>
       )}
       <button onClick={handleLogout} className="hover:underline text-left block">
@@ -49,9 +61,13 @@ export function Navbar() {
 
             {/* Mobile hamburger */}
             <button
+              ref={hamburgerRef}
               className="md:hidden text-white text-2xl leading-none"
               aria-label="Open menu"
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => {
+                setDrawerOpen(true)
+                setTimeout(() => closeButtonRef.current?.focus(), 0)
+              }}
             >
               ☰
             </button>
@@ -76,6 +92,7 @@ export function Navbar() {
             className="fixed top-0 right-0 h-full w-64 bg-green-800 text-white z-50 flex flex-col p-6 gap-5 text-sm"
           >
             <button
+              ref={closeButtonRef}
               className="self-end text-2xl leading-none"
               aria-label="Close menu"
               onClick={close}

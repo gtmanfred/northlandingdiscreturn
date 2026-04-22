@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { vi } from 'vitest'
 
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true, logout: vi.fn() }),
@@ -53,4 +52,13 @@ it('drawer contains nav links', async () => {
   expect(dialog).toHaveTextContent('My Discs')
   expect(dialog).toHaveTextContent('Wishlist')
   expect(dialog).toHaveTextContent('Profile')
+})
+
+it('drawer closes when backdrop is clicked', async () => {
+  const user = userEvent.setup()
+  renderNavbar()
+  await user.click(screen.getByRole('button', { name: 'Open menu' }))
+  const backdrop = document.querySelector('[aria-hidden="true"]') as HTMLElement
+  await user.click(backdrop)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
