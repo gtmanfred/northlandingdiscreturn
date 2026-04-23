@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.disc import DiscRepository
 from app.repositories.pickup_event import PickupEventRepository
 from app.models.pickup_event import PickupEvent
+from app.core.timezone import COURSE_TIMEZONE
 
 
 FINAL_NOTICE_THRESHOLD = 6
@@ -40,6 +41,13 @@ async def enqueue_pickup_notifications(
         notified_disc_count += 1
 
     sms_count = 0
+    local_start = event.start_at.astimezone(COURSE_TIMEZONE)
+    local_end = event.end_at.astimezone(COURSE_TIMEZONE)
+    window_str = (
+        f"{local_start.strftime('%b %-d')} from "
+        f"{local_start.strftime('%-I:%M %p')} to "
+        f"{local_end.strftime('%-I:%M %p')} ET"
+    )
     for phone_number, discs in phone_discs.items():
         disc_list = ", ".join(
             f"{d.manufacturer} {d.name} ({d.color})" for d in discs
@@ -47,12 +55,12 @@ async def enqueue_pickup_notifications(
         if phone_is_final.get(phone_number):
             message = (
                 f"FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the "
-                f"sale box if not picked up at the {event.scheduled_date} pickup. "
+                f"sale box if not picked up at the {window_str} pickup. "
                 "Reply STOP to opt out."
             )
         else:
             message = (
-                f"Disc pickup at North Landing scheduled for {event.scheduled_date}. "
+                f"Disc pickup at North Landing {window_str}. "
                 f"You have disc(s): {disc_list}. Reply STOP to opt out."
             )
         await event_repo.create_sms_job(phone_number=phone_number, message=message)
