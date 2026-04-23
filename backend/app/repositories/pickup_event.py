@@ -1,6 +1,6 @@
 # backend/app/repositories/pickup_event.py
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.pickup_event import PickupEvent, DiscPickupNotification, SMSJob, SMSJobStatus
@@ -10,8 +10,10 @@ class PickupEventRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_event(self, *, scheduled_date: date, notes: str | None = None) -> PickupEvent:
-        event = PickupEvent(scheduled_date=scheduled_date, notes=notes)
+    async def create_event(
+        self, *, start_at: datetime, end_at: datetime, notes: str | None = None
+    ) -> PickupEvent:
+        event = PickupEvent(start_at=start_at, end_at=end_at, notes=notes)
         self.db.add(event)
         await self.db.flush()
         await self.db.refresh(event)
@@ -23,13 +25,27 @@ class PickupEventRepository:
 
     async def list_events(self) -> list[PickupEvent]:
         result = await self.db.execute(
-            select(PickupEvent).order_by(PickupEvent.scheduled_date.desc())
+            select(PickupEvent).order_by(PickupEvent.start_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def list_published_events(self) -> list[PickupEvent]:
+        result = await self.db.execute(
+            select(PickupEvent)
+            .where(PickupEvent.notifications_sent_at.is_not(None))
+            .order_by(PickupEvent.start_at.desc())
         )
         return list(result.scalars().all())
 
     async def update_event(self, event: PickupEvent, **kwargs) -> PickupEvent:
+        bump_sequence = False
         for key, value in kwargs.items():
+            current = getattr(event, key)
+            if key in ("start_at", "end_at", "notes") and value != current:
+                bump_sequence = True
             setattr(event, key, value)
+        if bump_sequence:
+            event.sequence = (event.sequence or 0) + 1
         await self.db.flush()
         await self.db.refresh(event)
         return event

@@ -1,24 +1,29 @@
 # backend/tests/test_admin.py
 import uuid
 import pytest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from app.repositories.pickup_event import PickupEventRepository
 from app.repositories.disc import DiscRepository
 from app.services.auth import create_access_token
 from app.repositories.user import UserRepository
 
 
+def _window(days_from_now: int) -> dict:
+    start = datetime.now(timezone.utc) + timedelta(days=days_from_now, hours=1)
+    return {"start_at": start, "end_at": start + timedelta(hours=2)}
+
+
 async def test_create_pickup_event(db):
     repo = PickupEventRepository(db)
-    event = await repo.create_event(scheduled_date=date.today() + timedelta(days=7))
+    event = await repo.create_event(**_window(7))
     assert event.id is not None
     assert event.notifications_sent_at is None
 
 
 async def test_list_pickup_events(db):
     repo = PickupEventRepository(db)
-    await repo.create_event(scheduled_date=date.today() + timedelta(days=7))
-    await repo.create_event(scheduled_date=date.today() + timedelta(days=14))
+    await repo.create_event(**_window(7))
+    await repo.create_event(**_window(14))
     events = await repo.list_events()
     assert len(events) == 2
 
@@ -30,7 +35,7 @@ async def test_create_disc_notification(db):
         manufacturer="Innova", name="Boss", color="Blue",
         input_date=date.today(), phone_number="+15551234567"
     )
-    event = await event_repo.create_event(scheduled_date=date.today() + timedelta(days=3))
+    event = await event_repo.create_event(**_window(3))
     notif = await event_repo.create_disc_notification(
         disc_id=disc.id, pickup_event_id=event.id, is_final_notice=False
     )
@@ -46,7 +51,7 @@ async def test_count_prior_notifications(db):
         input_date=date.today(), phone_number="+15559999999"
     )
     for i in range(3):
-        event = await event_repo.create_event(scheduled_date=date.today() + timedelta(days=i))
+        event = await event_repo.create_event(**_window(i))
         await event_repo.create_disc_notification(disc_id=disc.id, pickup_event_id=event.id)
     count = await event_repo.count_notifications_for_disc(disc.id)
     assert count == 3
@@ -88,9 +93,11 @@ async def test_list_users(client, db):
 
 async def test_create_pickup_event_endpoint(client, db):
     admin = await make_admin_user(db)
+    start = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=7, hours=2)).isoformat()
     resp = await client.post(
         "/admin/pickup-events",
-        json={"scheduled_date": str(date.today() + timedelta(days=7))},
+        json={"start_at": start, "end_at": end},
         headers=admin_token(admin.id),
     )
     assert resp.status_code == 201
@@ -106,9 +113,11 @@ async def test_notify_pickup_event(client, db):
     )
     await db.commit()
 
+    start = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=3, hours=2)).isoformat()
     event_resp = await client.post(
         "/admin/pickup-events",
-        json={"scheduled_date": str(date.today() + timedelta(days=3))},
+        json={"start_at": start, "end_at": end},
         headers=admin_token(admin.id),
     )
     event_id = event_resp.json()["id"]
@@ -158,3 +167,65 @@ async def test_can_demote_non_seed_admin(client, db, monkeypatch):
     )
     assert resp.status_code == 200
     assert resp.json()["is_admin"] is False
+
+
+async def test_update_event_bumps_sequence_on_time_change(db):
+    repo = PickupEventRepository(db)
+    event = await repo.create_event(**_window(7))
+    assert event.sequence == 0
+    new_start = event.start_at + timedelta(hours=1)
+    new_end = event.end_at + timedelta(hours=1)
+    await repo.update_event(event, start_at=new_start, end_at=new_end)
+    assert event.sequence == 1
+
+
+async def test_update_event_does_not_bump_when_unchanged(db):
+    repo = PickupEventRepository(db)
+    event = await repo.create_event(**_window(7), notes="hello")
+    await repo.update_event(event, notes="hello")
+    assert event.sequence == 0
+
+
+async def test_edit_notified_event_bumps_sequence(client, db):
+    admin = await make_admin_user(db)
+    start = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=3, hours=2)).isoformat()
+    create_resp = await client.post(
+        "/admin/pickup-events",
+        json={"start_at": start, "end_at": end},
+        headers=admin_token(admin.id),
+    )
+    event_id = create_resp.json()["id"]
+    assert create_resp.json()["sequence"] == 0
+
+    # Force notifications_sent_at via a direct DB update (no discs to notify)
+    from sqlalchemy import update
+    from app.models.pickup_event import PickupEvent
+    await db.execute(
+        update(PickupEvent)
+        .where(PickupEvent.id == uuid.UUID(event_id))
+        .values(notifications_sent_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
+    new_start = (datetime.now(timezone.utc) + timedelta(days=3, hours=1)).isoformat()
+    new_end = (datetime.now(timezone.utc) + timedelta(days=3, hours=3)).isoformat()
+    patch_resp = await client.patch(
+        f"/admin/pickup-events/{event_id}",
+        json={"start_at": new_start, "end_at": new_end},
+        headers=admin_token(admin.id),
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["sequence"] == 1
+
+
+async def test_create_event_rejects_reversed_window(client, db):
+    admin = await make_admin_user(db)
+    start = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=7) - timedelta(hours=1)).isoformat()
+    resp = await client.post(
+        "/admin/pickup-events",
+        json={"start_at": start, "end_at": end},
+        headers=admin_token(admin.id),
+    )
+    assert resp.status_code == 422
