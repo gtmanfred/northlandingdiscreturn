@@ -1,6 +1,6 @@
 # backend/app/routers/admin.py
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone  # date still used in add_user_wishlist
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -128,7 +128,9 @@ async def create_pickup_event(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = PickupEventRepository(db)
-    event = await repo.create_event(scheduled_date=body.scheduled_date, notes=body.notes)
+    event = await repo.create_event(
+        start_at=body.start_at, end_at=body.end_at, notes=body.notes
+    )
     await db.commit()
     return event
 
@@ -144,7 +146,11 @@ async def update_pickup_event(
     event = await repo.get_event(event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Pickup event not found")
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    new_start = updates.get("start_at", event.start_at)
+    new_end = updates.get("end_at", event.end_at)
+    if new_end <= new_start:
+        raise HTTPException(status_code=422, detail="end_at must be after start_at")
     event = await repo.update_event(event, **updates)
     await db.commit()
     return event
