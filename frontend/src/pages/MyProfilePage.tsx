@@ -7,9 +7,16 @@ import {
   useRemovePhone,
   getGetMeQueryKey,
 } from '../api/northlanding'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PageHeader } from '../components/PageHeader'
+import { LoadingState } from '../components/LoadingState'
 import { PhoneInput } from '../components/PhoneInput'
 import { normalizePhone } from '../utils/phone'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 type Step = 'idle' | 'code-sent'
 
@@ -66,77 +73,100 @@ export function MyProfilePage() {
     refresh()
   }
 
-  if (isLoading) return <LoadingSpinner />
+  if (isLoading) return <LoadingState />
 
   return (
-    <div className="max-w-md">
-      <h1 className="text-2xl font-bold mb-6 text-green-800">My Profile</h1>
+    <div className="max-w-xl">
+      <PageHeader title="My Profile" />
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-        <p className="font-medium">{user?.name}</p>
-        <p className="text-gray-500 text-sm">{user?.email}</p>
-        {user?.is_admin && <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">Admin</span>}
-      </div>
-
-      <h2 className="text-lg font-semibold mb-3">Linked Phone Numbers</h2>
-
-      <div className="space-y-2 mb-2">
-        {user?.phone_numbers?.map((p) => (
-          <div key={p.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-medium text-sm">{p.number}</p>
-              {p.verified
-                ? <p className="text-xs text-green-600">Verified</p>
-                : <p className="text-xs text-yellow-600">Unverified</p>}
+              <p className="font-medium text-foreground">{user?.name}</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
             </div>
-            <button
-              onClick={() => handleRemove(p.number)}
-              className="text-red-500 text-sm hover:text-red-700"
-            >
-              Remove
-            </button>
+            {user?.is_admin && (
+              <Badge className="border-transparent bg-blue-100 text-blue-800 hover:bg-blue-100">
+                Admin
+              </Badge>
+            )}
           </div>
-        ))}
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="mt-6">
-        {step === 'idle' ? (
-          <form onSubmit={handleAddPhone} className="flex flex-col gap-3">
-            <PhoneInput value={newNumber} onChange={setNewNumber} />
-            <button
-              type="submit"
-              disabled={addPhone.isPending}
-              className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50 self-start"
-            >
-              Add Phone
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify} className="flex flex-col gap-2">
-            <p className="text-sm text-gray-600">
-              Enter the 6-digit code sent to {pendingNumber}:
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="123456"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-2 flex-1"
-              />
-              <button
-                type="submit"
-                disabled={verifyPhone.isPending}
-                className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Linked Phone Numbers</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {user?.phone_numbers?.length ? (
+            user.phone_numbers.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2"
               >
-                Verify
-              </button>
-            </div>
-          </form>
-        )}
-        {error && <p className="mt-2 text-red-600 text-sm">{error}</p>}
-      </div>
+                <div>
+                  <p className="text-sm font-medium">{p.number}</p>
+                  {p.verified ? (
+                    <p className="text-xs text-green-700">Verified</p>
+                  ) : (
+                    <p className="text-xs text-yellow-700">Unverified</p>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => handleRemove(p.number)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">No phone numbers linked yet.</p>
+          )}
+
+          <div className="pt-4">
+            {step === 'idle' ? (
+              <form onSubmit={handleAddPhone} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone-new">Add a phone number</Label>
+                  <PhoneInput value={newNumber} onChange={setNewNumber} />
+                </div>
+                <Button type="submit" disabled={addPhone.isPending}>
+                  Add phone
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerify} className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Enter the 6-digit code sent to {pendingNumber}:
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="123456"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                  <Button type="submit" disabled={verifyPhone.isPending}>
+                    Verify
+                  </Button>
+                </div>
+              </form>
+            )}
+            {error && (
+              <Alert variant="destructive" className="mt-3">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

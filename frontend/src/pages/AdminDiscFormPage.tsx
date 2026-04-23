@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { ImagePlus, X } from 'lucide-react'
 import {
   useCreateDisc,
   useUpdateDisc,
@@ -13,9 +14,15 @@ import {
 } from '../api/northlanding'
 import { AutocompleteInput, type Suggestion } from '../components/AutocompleteInput'
 import { PhotoUpload } from '../components/PhotoUpload'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PageHeader } from '../components/PageHeader'
+import { LoadingState } from '../components/LoadingState'
 import { PhoneInput } from '../components/PhoneInput'
 import { normalizePhone } from '../utils/phone'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface DiscFormState {
   manufacturer: string
@@ -40,6 +47,9 @@ const defaultForm: DiscFormState = {
   is_found: true,
   is_returned: false,
 }
+
+const inputCls =
+  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
 
 export function AdminDiscFormPage() {
   const { discId } = useParams<{ discId?: string }>()
@@ -105,7 +115,10 @@ export function AdminDiscFormPage() {
 
   const set = (field: keyof DiscFormState) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((f) => ({ ...f, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
+      setForm((f) => ({
+        ...f,
+        [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value,
+      }))
 
   const setValue = (field: keyof DiscFormState) => (value: string) =>
     setForm((f) => ({ ...f, [field]: value }))
@@ -173,170 +186,173 @@ export function AdminDiscFormPage() {
     await submitForm(false)
   }
 
-  if (isEdit && isLoading) return <LoadingSpinner />
-  if (isEdit && !isLoading && !existingDisc) return (
-    <div className="p-8 text-center text-red-600">Disc not found.</div>
-  )
+  if (isEdit && isLoading) return <LoadingState />
+  if (isEdit && !isLoading && !existingDisc)
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>Disc not found.</AlertDescription>
+      </Alert>
+    )
 
-  const isSaving = createMutation.isPending || updateMutation.isPending || uploadMutation.isPending
-
-  const inputClass = 'w-full border border-gray-300 rounded px-3 py-3 text-base'
+  const isSaving =
+    createMutation.isPending || updateMutation.isPending || uploadMutation.isPending
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-bold mb-6 text-green-800">
-        {isEdit ? 'Edit Disc' : 'Add Disc'}
-      </h1>
+    <div className="max-w-xl">
+      <PageHeader title={isEdit ? 'Edit Disc' : 'Add Disc'} />
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {(
-          [
-            { field: 'manufacturer', suggestions: manufacturerSuggestions },
-            { field: 'name', suggestions: nameSuggestions },
-            { field: 'color', suggestions: colorSuggestions },
-          ] as const
-        ).map(({ field, suggestions }) => (
-          <div key={field}>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
-              {field} *
-            </label>
-            <AutocompleteInput
-              required
-              value={form[field]}
-              suggestions={suggestions.map((v) => ({ value: v }))}
-              onValueChange={setValue(field)}
-              className={inputClass}
-            />
-          </div>
-        ))}
-
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
-            Input Date *
-          </label>
-          <input
-            type="date"
-            required
-            value={form.input_date}
-            onChange={set('input_date')}
-            className={inputClass}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
-            Owner Name
-          </label>
-          <AutocompleteInput
-            value={form.owner_name}
-            suggestions={ownerNameSuggestions.map((v) => ({ value: v }))}
-            onValueChange={handleOwnerNameChange}
-            className={inputClass}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
-            Phone Number
-          </label>
-          {phoneSuggestions.length > 0 ? (
-            <AutocompleteInput
-              type="tel"
-              placeholder="(555) 123-4567"
-              value={form.phone_number}
-              suggestions={phoneSuggestions}
-              onValueChange={setValue('phone_number')}
-              className={inputClass}
-            />
-          ) : (
-            <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} className="py-3" />
-          )}
-        </div>
-
-        <div className="flex gap-6 py-1">
-          {(['is_clear', 'is_found', 'is_returned'] as const).map((field) => (
-            <label key={field} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form[field]} onChange={set(field)} className="rounded w-5 h-5" />
-              {field.replace('is_', '').replace('_', ' ')}
-            </label>
-          ))}
-        </div>
-
-        {/* Photos */}
-        {isEdit && existingDisc ? (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">Photos</p>
-            <PhotoUpload discId={discId!} existingPhotos={existingDisc.photos ?? []} />
-          </div>
-        ) : (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">Photos</p>
-            {/* Staged photo thumbnails */}
-            {stagedPhotos.length > 0 && (
-              <div className="flex gap-2 mb-3 flex-wrap">
-                {stagedPhotos.map((_file, i) => (
-                  <div key={i} className="relative group w-20 h-20">
-                    <img
-                      src={stagedPreviews[i]}
-                      alt=""
-                      className="w-20 h-20 object-cover rounded"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setStagedPhotos((p) => p.filter((_, j) => j !== i))}
-                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            {(
+              [
+                { field: 'manufacturer', suggestions: manufacturerSuggestions, label: 'Manufacturer' },
+                { field: 'name', suggestions: nameSuggestions, label: 'Name' },
+                { field: 'color', suggestions: colorSuggestions, label: 'Color' },
+              ] as const
+            ).map(({ field, suggestions, label }) => (
+              <div key={field} className="space-y-1.5">
+                <Label htmlFor={`disc-${field}`}>{label} *</Label>
+                <AutocompleteInput
+                  id={`disc-${field}`}
+                  required
+                  value={form[field]}
+                  suggestions={suggestions.map((v) => ({ value: v }))}
+                  onValueChange={setValue(field)}
+                  className={inputCls}
+                />
               </div>
+            ))}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="disc-input-date">Input date *</Label>
+              <Input
+                id="disc-input-date"
+                type="date"
+                required
+                value={form.input_date}
+                onChange={set('input_date')}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="disc-owner">Owner name</Label>
+              <AutocompleteInput
+                id="disc-owner"
+                value={form.owner_name}
+                suggestions={ownerNameSuggestions.map((v) => ({ value: v }))}
+                onValueChange={handleOwnerNameChange}
+                className={inputCls}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="disc-phone">Phone number</Label>
+              {phoneSuggestions.length > 0 ? (
+                <AutocompleteInput
+                  id="disc-phone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={form.phone_number}
+                  suggestions={phoneSuggestions}
+                  onValueChange={setValue('phone_number')}
+                  className={inputCls}
+                />
+              ) : (
+                <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-6 pt-1">
+              {(['is_clear', 'is_found', 'is_returned'] as const).map((field) => (
+                <label key={field} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form[field]}
+                    onChange={set(field)}
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
+                  {field.replace('is_', '').replace('_', ' ')}
+                </label>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            <Label>Photos</Label>
+            {isEdit && existingDisc ? (
+              <PhotoUpload discId={discId!} existingPhotos={existingDisc.photos ?? []} />
+            ) : (
+              <>
+                {stagedPhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {stagedPhotos.map((_file, i) => (
+                      <div key={i} className="group relative h-20 w-20">
+                        <img
+                          src={stagedPreviews[i]}
+                          alt=""
+                          className="h-20 w-20 rounded-md object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setStagedPhotos((p) => p.filter((_, j) => j !== i))
+                          }
+                          className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                          aria-label="Remove photo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handlePhotoSelect}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-4 text-sm text-muted-foreground hover:border-muted-foreground/60"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Add photos
+                </button>
+              </>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handlePhotoSelect}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-sm hover:border-gray-400"
-            >
-              + Add Photos
-            </button>
-          </div>
+          </CardContent>
+        </Card>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="bg-green-700 text-white px-6 py-3 rounded hover:bg-green-800 disabled:opacity-50 text-base font-medium"
-          >
+        <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur sm:relative sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
+          <Button type="submit" disabled={isSaving}>
             {isSaving ? 'Saving…' : isEdit ? 'Update' : 'Create'}
-          </button>
+          </Button>
           {!isEdit && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
               disabled={isSaving}
               onClick={() => submitForm(true)}
-              className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 disabled:opacity-50 text-base font-medium"
             >
               Save and Add Another
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() => navigate('/admin/discs')}
-            className="px-6 py-3 border border-gray-300 rounded hover:bg-gray-50 text-base"
-          >
+          <Button type="button" variant="outline" onClick={() => navigate('/admin/discs')}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </div>

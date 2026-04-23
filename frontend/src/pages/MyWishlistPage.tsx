@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import {
   useGetMyWishlist,
   useAddWishlistDisc,
@@ -9,7 +10,13 @@ import {
   getGetMyWishlistQueryKey,
 } from '../api/northlanding'
 import { AutocompleteInput } from '../components/AutocompleteInput'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PageHeader } from '../components/PageHeader'
+import { EmptyState } from '../components/EmptyState'
+import { LoadingState } from '../components/LoadingState'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function MyWishlistPage() {
   const queryClient = useQueryClient()
@@ -46,89 +53,107 @@ export function MyWishlistPage() {
     queryClient.invalidateQueries({ queryKey: getGetMyWishlistQueryKey() })
   }
 
-  if (userLoading || discsLoading) return <LoadingSpinner />
+  if (userLoading || discsLoading) return <LoadingState />
+
+  const inputCls =
+    'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6 text-green-800">My Wishlist</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Log discs you lost at North Landing so staff can match them if found.
-      </p>
+      <PageHeader
+        title="My Wishlist"
+        description="Log discs you lost at North Landing so staff can match them if found."
+      />
 
       {verifiedNumbers.length === 0 ? (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8 text-yellow-800 text-sm">
-          Add and verify a phone number in your account settings before adding discs to your wishlist.
-        </div>
+        <Alert className="mb-8 border-yellow-200 bg-yellow-50 text-yellow-900">
+          <AlertDescription>
+            Add and verify a phone number in your account settings before adding discs to your wishlist.
+          </AlertDescription>
+        </Alert>
       ) : (
-        <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-lg p-4 mb-8 flex gap-3 flex-wrap">
-          <AutocompleteInput
-            containerClassName="flex-1 min-w-32"
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            placeholder="Manufacturer"
-            value={form.manufacturer}
-            suggestions={manufacturerSuggestions.map((v) => ({ value: v }))}
-            onValueChange={(v) => setForm((f) => ({ ...f, manufacturer: v }))}
-          />
-          <AutocompleteInput
-            containerClassName="flex-1 min-w-32"
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            placeholder="Disc name"
-            value={form.name}
-            suggestions={nameSuggestions.map((v) => ({ value: v }))}
-            onValueChange={(v) => setForm((f) => ({ ...f, name: v }))}
-          />
-          <AutocompleteInput
-            containerClassName="flex-1 min-w-24"
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            placeholder="Color"
-            value={form.color}
-            suggestions={colorSuggestions.map((v) => ({ value: v }))}
-            onValueChange={(v) => setForm((f) => ({ ...f, color: v }))}
-          />
-          {verifiedNumbers.length > 1 ? (
-            <select
-              value={phoneNumber}
-              onChange={(e) => setSelectedPhone(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 bg-white"
-              aria-label="Phone number"
-            >
-              {verifiedNumbers.map((p) => (
-                <option key={p.id} value={p.number}>{p.number}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="flex items-center px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded bg-gray-50">
-              {verifiedNumbers[0].number}
-            </span>
-          )}
-          <button
-            type="submit"
-            disabled={addMutation.isPending}
-            className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800 disabled:opacity-50"
-          >
-            Add
-          </button>
-        </form>
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <form onSubmit={handleAdd} className="flex flex-wrap gap-3">
+              <AutocompleteInput
+                containerClassName="flex-1 min-w-32"
+                className={inputCls}
+                placeholder="Manufacturer"
+                value={form.manufacturer}
+                suggestions={manufacturerSuggestions.map((v) => ({ value: v }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, manufacturer: v }))}
+              />
+              <AutocompleteInput
+                containerClassName="flex-1 min-w-32"
+                className={inputCls}
+                placeholder="Disc name"
+                value={form.name}
+                suggestions={nameSuggestions.map((v) => ({ value: v }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, name: v }))}
+              />
+              <AutocompleteInput
+                containerClassName="flex-1 min-w-24"
+                className={inputCls}
+                placeholder="Color"
+                value={form.color}
+                suggestions={colorSuggestions.map((v) => ({ value: v }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, color: v }))}
+              />
+              {verifiedNumbers.length > 1 ? (
+                <Select value={phoneNumber} onValueChange={setSelectedPhone}>
+                  <SelectTrigger className="w-44" aria-label="Phone number">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {verifiedNumbers.map((p) => (
+                      <SelectItem key={p.id} value={p.number}>
+                        {p.number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="flex items-center rounded-md border border-border bg-muted px-3 text-sm text-muted-foreground">
+                  {verifiedNumbers[0].number}
+                </span>
+              )}
+              <Button type="submit" disabled={addMutation.isPending}>
+                Add
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
       {!discs?.length ? (
-        <p className="text-gray-500">Your wishlist is empty.</p>
+        <EmptyState title="Your wishlist is empty" description="Add discs above to start matching." />
       ) : (
         <ul className="space-y-2">
           {discs.map((disc) => (
-            <li key={disc.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-              <span>
-                <span className="font-medium">{disc.name}</span>
-                {disc.manufacturer && <span className="text-gray-500 ml-2 text-sm">{disc.manufacturer}</span>}
-                {disc.color && <span className="text-gray-400 ml-2 text-sm">· {disc.color}</span>}
-              </span>
-              <button
-                onClick={() => handleRemove(disc.id)}
-                disabled={removeMutation.isPending}
-                className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
-              >
-                Remove
-              </button>
+            <li key={disc.id}>
+              <Card>
+                <CardContent className="flex items-center justify-between p-3">
+                  <span>
+                    <span className="font-medium text-foreground">{disc.name}</span>
+                    {disc.manufacturer && (
+                      <span className="ml-2 text-sm text-muted-foreground">{disc.manufacturer}</span>
+                    )}
+                    {disc.color && (
+                      <span className="ml-2 text-sm text-muted-foreground">· {disc.color}</span>
+                    )}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemove(disc.id)}
+                    disabled={removeMutation.isPending}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Remove
+                  </Button>
+                </CardContent>
+              </Card>
             </li>
           ))}
         </ul>
