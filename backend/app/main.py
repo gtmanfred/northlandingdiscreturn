@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.repositories.user import UserRepository
-from app.routers import auth, discs, users, admin, webhooks, suggestions
+from app.routers import auth, discs, users, admin, webhooks, suggestions, public_calendar
 from app.services.storage import get_storage_client
 
 logger = logging.getLogger(__name__)
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
     app.include_router(suggestions.router, prefix="/suggestions", tags=["suggestions"])
+    app.include_router(public_calendar.router, tags=["calendar"])
 
     @app.get("/health", include_in_schema=False)
     async def health():
