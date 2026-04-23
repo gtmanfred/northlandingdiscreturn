@@ -135,7 +135,8 @@ export interface PhoneSuggestion {
 export type PickupEventCreateNotes = string | null;
 
 export interface PickupEventCreate {
-  scheduled_date: string;
+  start_at: string;
+  end_at: string;
   notes?: PickupEventCreateNotes;
 }
 
@@ -145,18 +146,23 @@ export type PickupEventOutNotificationsSentAt = string | null;
 
 export interface PickupEventOut {
   id: string;
-  scheduled_date: string;
+  start_at: string;
+  end_at: string;
   notes: PickupEventOutNotes;
   notifications_sent_at: PickupEventOutNotificationsSentAt;
+  sequence: number;
   created_at: string;
 }
 
-export type PickupEventUpdateScheduledDate = string | null;
+export type PickupEventUpdateStartAt = string | null;
+
+export type PickupEventUpdateEndAt = string | null;
 
 export type PickupEventUpdateNotes = string | null;
 
 export interface PickupEventUpdate {
-  scheduled_date?: PickupEventUpdateScheduledDate;
+  start_at?: PickupEventUpdateStartAt;
+  end_at?: PickupEventUpdateEndAt;
   notes?: PickupEventUpdateNotes;
 }
 

@@ -1,3 +1,6 @@
+/Users/daniel/conductor/workspaces/northlandingdiscreturn/san-jose/backend/.venv/lib/python3.12/site-packages/authlib/_joserfc_helpers.py:8: AuthlibDeprecationWarning: authlib.jose module is deprecated, please use joserfc instead.
+It will be compatible before version 2.0.0.
+  from authlib.jose import ECKey
 {
   "openapi": "3.1.0",
   "info": {
@@ -43,6 +46,53 @@
         }
       }
     },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh Token",
+        "operationId": "refreshToken",
+        "parameters": [
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/logout": {
       "post": {
         "tags": [
@@ -50,12 +100,40 @@
         ],
         "summary": "Logout",
         "operationId": "logout",
+        "parameters": [
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Refresh Token"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -638,6 +716,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/users/me/discs": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get My Discs",
+        "operationId": "getMyDiscs",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DiscOut"
+                  },
+                  "type": "array",
+                  "title": "Response Getmydiscs"
                 }
               }
             }
@@ -1247,8 +1355,8 @@
         "properties": {
           "file": {
             "type": "string",
-            "title": "File",
-            "format": "binary"
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
           }
         },
         "type": "object",
@@ -1654,10 +1762,15 @@
       },
       "PickupEventCreate": {
         "properties": {
-          "scheduled_date": {
+          "start_at": {
             "type": "string",
-            "format": "date",
-            "title": "Scheduled Date"
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
           },
           "notes": {
             "anyOf": [
@@ -1673,7 +1786,8 @@
         },
         "type": "object",
         "required": [
-          "scheduled_date"
+          "start_at",
+          "end_at"
         ],
         "title": "PickupEventCreate"
       },
@@ -1684,10 +1798,15 @@
             "format": "uuid",
             "title": "Id"
           },
-          "scheduled_date": {
+          "start_at": {
             "type": "string",
-            "format": "date",
-            "title": "Scheduled Date"
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
           },
           "notes": {
             "anyOf": [
@@ -1712,6 +1831,10 @@
             ],
             "title": "Notifications Sent At"
           },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1721,26 +1844,40 @@
         "type": "object",
         "required": [
           "id",
-          "scheduled_date",
+          "start_at",
+          "end_at",
           "notes",
           "notifications_sent_at",
+          "sequence",
           "created_at"
         ],
         "title": "PickupEventOut"
       },
       "PickupEventUpdate": {
         "properties": {
-          "scheduled_date": {
+          "start_at": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "date"
+                "format": "date-time"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Scheduled Date"
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
           },
           "notes": {
             "anyOf": [
@@ -1921,7 +2058,11 @@
             ],
             "title": "Color"
           },
-          "notes": {
+          "phone_number": {
+            "type": "string",
+            "title": "Phone Number"
+          },
+          "owner_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -1930,10 +2071,13 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "Owner Name"
           }
         },
         "type": "object",
+        "required": [
+          "phone_number"
+        ],
         "title": "WishlistDiscCreate"
       }
     },
