@@ -5,7 +5,20 @@ import {
   useAdminUpdateUser,
   getAdminListUsersQueryKey,
 } from '../api/northlanding'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { PageHeader } from '../components/PageHeader'
+import { LoadingState } from '../components/LoadingState'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export function AdminUsersPage() {
   const queryClient = useQueryClient()
@@ -25,55 +38,71 @@ export function AdminUsersPage() {
     }
   }
 
-  if (isLoading) return <LoadingSpinner />
+  if (isLoading) return <LoadingState />
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6 text-green-800">Users</h1>
+      <PageHeader title="Users" />
 
-      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="bg-gray-100 text-left">
-              <th className="px-3 py-2 border border-gray-200">Name</th>
-              <th className="px-3 py-2 border border-gray-200">Email</th>
-              <th className="px-3 py-2 border border-gray-200">Phones</th>
-              <th className="px-3 py-2 border border-gray-200">Admin</th>
-              <th className="px-3 py-2 border border-gray-200">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(users ?? []).map((user) => (
-              <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2 border border-gray-200 font-medium">{user.name}</td>
-                <td className="px-3 py-2 border border-gray-200 text-gray-600">{user.email}</td>
-                <td className="px-3 py-2 border border-gray-200">
-                  {user.phone_numbers
-                    ?.filter((p) => p.verified)
-                    .map((p) => p.number)
-                    .join(', ') || '—'}
-                </td>
-                <td className="px-3 py-2 border border-gray-200">
-                  {user.is_admin ? (
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">Admin</span>
-                  ) : '—'}
-                </td>
-                <td className="px-3 py-2 border border-gray-200">
-                  <button
-                    onClick={() => handlePromote(user.id, user.name, user.is_admin)}
-                    disabled={updateMutation.isPending}
-                    className={`text-sm ${user.is_admin ? 'text-red-500 hover:text-red-700' : 'text-blue-600 hover:text-blue-800'} disabled:opacity-50`}
-                  >
-                    {user.is_admin ? 'Remove admin' : 'Make admin'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phones</TableHead>
+                <TableHead>Admin</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(users ?? []).map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {user.phone_numbers
+                      ?.filter((p) => p.verified)
+                      .map((p) => p.number)
+                      .join(', ') || '—'}
+                  </TableCell>
+                  <TableCell>
+                    {user.is_admin ? (
+                      <Badge className="border-transparent bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        Admin
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePromote(user.id, user.name, user.is_admin)}
+                      disabled={updateMutation.isPending}
+                      className={
+                        user.is_admin
+                          ? 'text-destructive hover:text-destructive'
+                          : 'text-primary hover:text-primary'
+                      }
+                    >
+                      {user.is_admin ? 'Remove admin' : 'Make admin'}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   )
 }

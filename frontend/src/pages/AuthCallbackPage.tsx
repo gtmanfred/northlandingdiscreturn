@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { LoadingState } from '../components/LoadingState'
 
 export function AuthCallbackPage() {
   const [params] = useSearchParams()
@@ -18,5 +18,5 @@ export function AuthCallbackPage() {
     }
   }, [])
 
-  return <LoadingSpinner />
+  return <LoadingState />
 }
