@@ -42,8 +42,8 @@ export function MyDiscsPage() {
                     title={disc.color}
                   />
                 </div>
-                {disc.owner_name && (
-                  <p className="mt-0.5 text-sm text-muted-foreground">Owner: {disc.owner_name}</p>
+                {disc.owner?.name && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">Owner: {disc.owner.name}</p>
                 )}
                 <div className="mt-2">
                   <StatusBadge status={discStatus(disc)} />

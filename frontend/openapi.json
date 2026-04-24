@@ -1,6 +1,3 @@
-/Users/daniel/conductor/workspaces/northlandingdiscreturn/san-jose/backend/.venv/lib/python3.12/site-packages/authlib/_joserfc_helpers.py:8: AuthlibDeprecationWarning: authlib.jose module is deprecated, please use joserfc instead.
-It will be compatible before version 2.0.0.
-  from authlib.jose import ECKey
 {
   "openapi": "3.1.0",
   "info": {
@@ -1355,8 +1352,8 @@ It will be compatible before version 2.0.0.
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "File"
+            "title": "File",
+            "format": "binary"
           }
         },
         "type": "object",
@@ -1445,27 +1442,15 @@ It will be compatible before version 2.0.0.
             "type": "string",
             "title": "Color"
           },
-          "owner_name": {
+          "owner": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/OwnerOut"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Owner Name"
-          },
-          "phone_number": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone Number"
+            ]
           },
           "is_clear": {
             "type": "boolean",
@@ -1513,8 +1498,6 @@ It will be compatible before version 2.0.0.
           "manufacturer",
           "name",
           "color",
-          "owner_name",
-          "phone_number",
           "is_clear",
           "input_date",
           "is_found",
@@ -1704,6 +1687,48 @@ It will be compatible before version 2.0.0.
           "discs_notified"
         ],
         "title": "NotifyResult"
+      },
+      "OwnerOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phone_number": {
+            "type": "string",
+            "title": "Phone Number"
+          },
+          "heads_up_sent_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heads Up Sent At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "phone_number",
+          "created_at"
+        ],
+        "title": "OwnerOut"
       },
       "PhoneNumberOut": {
         "properties": {
