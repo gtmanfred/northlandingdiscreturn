@@ -80,7 +80,7 @@ Intro copy (exact wording to be finalized at implementation):
 
 > Hi {name}, this is North Landing Disc Return. We found one of your discs. We'll text you again when we schedule a pickup event — these happen every 1–2 months.
 
-Wishlist entries (`is_found = False`, self-registered by a user) do NOT trigger a heads-up.
+Wishlist entries (`is_found = False`, self-registered by a user) still resolve-or-create an owner row (using the user's name and the verified phone number they register under), but do NOT trigger a heads-up SMS.
 
 ## User → Disc Lookup
 
