@@ -1,9 +1,11 @@
 # backend/app/schemas/disc.py
 import uuid
 from datetime import datetime, date
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_validator
 from app.phone import normalize_phone
+from app.schemas.owner import OwnerOut
 from app.services.storage import storage_path_to_url
+from pydantic import model_validator
 
 
 class DiscPhotoOut(BaseModel):
@@ -24,8 +26,7 @@ class DiscOut(BaseModel):
     manufacturer: str
     name: str
     color: str
-    owner_name: str | None
-    phone_number: str | None
+    owner: OwnerOut | None = None
     is_clear: bool
     input_date: date
     is_found: bool
@@ -52,6 +53,15 @@ class DiscCreate(BaseModel):
     @classmethod
     def normalize(cls, v: str | None) -> str | None:
         return normalize_phone(v) if v else None
+
+    @model_validator(mode="after")
+    def owner_fields_together(self) -> "DiscCreate":
+        # Allow neither-or-both. A lone name or lone phone is ambiguous.
+        if (self.owner_name is None) != (self.phone_number is None):
+            raise ValueError(
+                "owner_name and phone_number must be provided together or not at all"
+            )
+        return self
 
 
 class DiscUpdate(BaseModel):
