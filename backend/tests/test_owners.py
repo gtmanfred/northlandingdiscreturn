@@ -99,3 +99,59 @@ async def test_repo_mark_heads_up_sent(db):
     await db.commit()
     await db.refresh(owner)
     assert owner.heads_up_sent_at is not None
+
+
+from app.schemas.disc import DiscOut
+
+
+async def test_disc_out_embeds_owner(db):
+    from app.repositories.owner import OwnerRepository
+    from app.repositories.disc import DiscRepository
+    from datetime import date
+    disc_repo = DiscRepository(db)
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Eva", phone_number="+15555555555"
+    )
+    disc = await disc_repo.create(
+        manufacturer="MVP", name="Wave", color="green",
+        input_date=date(2026, 4, 1), owner_id=owner.id,
+    )
+    await db.commit()
+    disc = await disc_repo.get_by_id(disc.id)
+    out = DiscOut.model_validate(disc)
+    assert out.owner is not None
+    assert out.owner.name == "Eva"
+    assert out.owner.phone_number == "+15555555555"
+
+
+async def test_disc_repo_create_with_owner_id(db):
+    from app.repositories.owner import OwnerRepository
+    from app.repositories.disc import DiscRepository
+    from datetime import date
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Fred", phone_number="+15556666666"
+    )
+    disc = await DiscRepository(db).create(
+        manufacturer="Discraft", name="Buzzz", color="yellow",
+        input_date=date(2026, 4, 1), owner_id=owner.id,
+    )
+    await db.commit()
+    assert disc.owner_id == owner.id
+
+
+async def test_disc_repo_list_by_owner_ids(db):
+    from app.repositories.owner import OwnerRepository
+    from app.repositories.disc import DiscRepository
+    from datetime import date
+    repo = DiscRepository(db)
+    o1 = await OwnerRepository(db).resolve_or_create(name="G", phone_number="+15557000001")
+    o2 = await OwnerRepository(db).resolve_or_create(name="H", phone_number="+15557000002")
+    d1 = await repo.create(manufacturer="m", name="n", color="c",
+                           input_date=date(2026,4,1), owner_id=o1.id)
+    d2 = await repo.create(manufacturer="m", name="n", color="c",
+                           input_date=date(2026,4,1), owner_id=o2.id, is_found=False)
+    await db.commit()
+    found = await repo.list_found_by_owner_ids([o1.id, o2.id])
+    wish = await repo.list_wishlist_by_owner_ids([o1.id, o2.id])
+    assert {d.id for d in found} == {d1.id}
+    assert {d.id for d in wish} == {d2.id}

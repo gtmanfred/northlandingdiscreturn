@@ -18,8 +18,7 @@ class DiscRepository:
         name: str,
         color: str,
         input_date: date,
-        owner_name: str | None = None,
-        phone_number: str | None = None,
+        owner_id: uuid.UUID | None = None,
         is_clear: bool = False,
         is_found: bool = True,
     ) -> Disc:
@@ -28,8 +27,7 @@ class DiscRepository:
             name=name,
             color=color,
             input_date=input_date,
-            owner_name=owner_name,
-            phone_number=phone_number,
+            owner_id=owner_id,
             is_clear=is_clear,
             is_found=is_found,
         )
@@ -40,7 +38,9 @@ class DiscRepository:
 
     async def get_by_id(self, disc_id: uuid.UUID) -> Disc | None:
         result = await self.db.execute(
-            select(Disc).where(Disc.id == disc_id).options(selectinload(Disc.photos))
+            select(Disc)
+            .where(Disc.id == disc_id)
+            .options(selectinload(Disc.photos), selectinload(Disc.owner))
         )
         return result.scalar_one_or_none()
 
@@ -53,10 +53,11 @@ class DiscRepository:
         is_returned: bool | None = None,
         owner_name: str | None = None,
     ) -> list[Disc]:
+        from app.models.owner import Owner
         offset = (page - 1) * page_size
         stmt = (
             select(Disc)
-            .options(selectinload(Disc.photos))
+            .options(selectinload(Disc.photos), selectinload(Disc.owner))
             .order_by(Disc.created_at.desc())
             .offset(offset)
             .limit(page_size)
@@ -66,42 +67,33 @@ class DiscRepository:
         if is_returned is not None:
             stmt = stmt.where(Disc.is_returned == is_returned)
         if owner_name is not None:
-            stmt = stmt.where(Disc.owner_name.ilike(f"%{owner_name}%"))
+            stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
+                Owner.name.ilike(f"%{owner_name}%")
+            )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def list_by_phone(self, phone_number: str) -> list[Disc]:
+    async def list_by_owner_ids(self, owner_ids: list[uuid.UUID]) -> list[Disc]:
+        if not owner_ids:
+            return []
         result = await self.db.execute(
             select(Disc)
-            .where(Disc.phone_number == phone_number, Disc.is_found == True)  # noqa: E712
-            .options(selectinload(Disc.photos))
+            .where(Disc.owner_id.in_(owner_ids), Disc.is_found == True)  # noqa: E712
+            .options(selectinload(Disc.photos), selectinload(Disc.owner))
             .order_by(Disc.created_at.desc())
         )
         return list(result.scalars().all())
 
-    async def list_by_phones(self, phone_numbers: list[str]) -> list[Disc]:
-        result = await self.db.execute(
-            select(Disc)
-            .where(Disc.phone_number.in_(phone_numbers), Disc.is_found == True)  # noqa: E712
-            .options(selectinload(Disc.photos))
-            .order_by(Disc.created_at.desc())
-        )
-        return list(result.scalars().all())
+    async def list_found_by_owner_ids(self, owner_ids: list[uuid.UUID]) -> list[Disc]:
+        return await self.list_by_owner_ids(owner_ids)
 
-    async def list_wishlist_by_phones(self, phone_numbers: list[str]) -> list[Disc]:
+    async def list_wishlist_by_owner_ids(self, owner_ids: list[uuid.UUID]) -> list[Disc]:
+        if not owner_ids:
+            return []
         result = await self.db.execute(
             select(Disc)
-            .where(Disc.phone_number.in_(phone_numbers), Disc.is_found == False)  # noqa: E712
-            .options(selectinload(Disc.photos))
-            .order_by(Disc.created_at.desc())
-        )
-        return list(result.scalars().all())
-
-    async def list_found_by_phones(self, phone_numbers: list[str]) -> list[Disc]:
-        result = await self.db.execute(
-            select(Disc)
-            .where(Disc.phone_number.in_(phone_numbers), Disc.is_found == True)  # noqa: E712
-            .options(selectinload(Disc.photos))
+            .where(Disc.owner_id.in_(owner_ids), Disc.is_found == False)  # noqa: E712
+            .options(selectinload(Disc.photos), selectinload(Disc.owner))
             .order_by(Disc.created_at.desc())
         )
         return list(result.scalars().all())
@@ -113,33 +105,39 @@ class DiscRepository:
         is_returned: bool | None = None,
         owner_name: str | None = None,
     ) -> int:
+        from app.models.owner import Owner
         stmt = select(func.count()).select_from(Disc)
+        if owner_name is not None:
+            stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
+                Owner.name.ilike(f"%{owner_name}%")
+            )
         if is_found is not None:
             stmt = stmt.where(Disc.is_found == is_found)
         if is_returned is not None:
             stmt = stmt.where(Disc.is_returned == is_returned)
-        if owner_name is not None:
-            stmt = stmt.where(Disc.owner_name.ilike(f"%{owner_name}%"))
         result = await self.db.execute(stmt)
         return result.scalar_one()
 
-    async def count_by_phones(self, phone_numbers: list[str]) -> int:
+    async def count_by_owner_ids(self, owner_ids: list[uuid.UUID]) -> int:
+        if not owner_ids:
+            return 0
         result = await self.db.execute(
             select(func.count()).select_from(Disc).where(
-                Disc.phone_number.in_(phone_numbers),
+                Disc.owner_id.in_(owner_ids),
                 Disc.is_found == True,  # noqa: E712
             )
         )
         return result.scalar_one()
 
     async def list_unreturned_found(self) -> list[Disc]:
-        """All found, unreturned discs with a phone number — for pickup notifications."""
         result = await self.db.execute(
-            select(Disc).where(
+            select(Disc)
+            .where(
                 Disc.is_found == True,  # noqa: E712
                 Disc.is_returned == False,  # noqa: E712
-                Disc.phone_number.isnot(None),
-            ).options(selectinload(Disc.photos))
+                Disc.owner_id.isnot(None),
+            )
+            .options(selectinload(Disc.photos), selectinload(Disc.owner))
         )
         return list(result.scalars().all())
 
@@ -165,7 +163,6 @@ class DiscRepository:
         return photo
 
     async def delete_photo(self, photo_id: uuid.UUID) -> str | None:
-        """Returns the photo_path so the caller can delete from storage."""
         result = await self.db.execute(select(DiscPhoto).where(DiscPhoto.id == photo_id))
         photo = result.scalar_one_or_none()
         if photo:
