@@ -8,8 +8,10 @@ from app.database import get_db
 from app.deps import get_current_user, require_admin
 from app.models.user import User
 from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
 from app.repositories.user import UserRepository
 from app.schemas.disc import DiscOut, DiscCreate, DiscUpdate, DiscPage, DiscPhotoOut
+from app.services.heads_up import maybe_enqueue_heads_up
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
 
@@ -43,9 +45,10 @@ async def list_discs(
     else:
         user_repo = UserRepository(db)
         phones = await user_repo.get_verified_numbers(current_user.id)
-        numbers = [p.number for p in phones]
-        discs = await repo.list_by_phones(numbers)
-        total = await repo.count_by_phones(numbers)
+        phone_strs = [p.number for p in phones]
+        owner_ids = [o.id for o in await OwnerRepository(db).list_by_phones(phone_strs)]
+        discs = await repo.list_by_owner_ids(owner_ids)
+        total = await repo.count_by_owner_ids(owner_ids)
     return DiscPage(
         items=[DiscOut.model_validate(d) for d in discs],
         page=page,
@@ -61,10 +64,30 @@ async def create_disc(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = DiscRepository(db)
-    disc = await repo.create(**body.model_dump())
+    owner_id = None
+    owner_obj = None
+    if body.owner_name and body.phone_number:
+        owner_obj = await OwnerRepository(db).resolve_or_create(
+            name=body.owner_name, phone_number=body.phone_number
+        )
+        owner_id = owner_obj.id
+
+    disc = await repo.create(
+        manufacturer=body.manufacturer,
+        name=body.name,
+        color=body.color,
+        input_date=body.input_date,
+        owner_id=owner_id,
+        is_clear=body.is_clear,
+        is_found=body.is_found,
+    )
+
+    if owner_obj is not None:
+        await maybe_enqueue_heads_up(owner=owner_obj, is_found=disc.is_found, db=db)
+
     await db.commit()
-    disc = await repo.get_by_id(disc.id)
-    return disc
+    # Reload with owner + photos for the response
+    return await repo.get_by_id(disc.id)
 
 
 @router.patch("/{disc_id}", response_model=DiscOut, operation_id="updateDisc")
@@ -78,13 +101,33 @@ async def update_disc(
     disc = await repo.get_by_id(disc_id)
     if disc is None:
         raise HTTPException(status_code=404, detail="Disc not found")
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not updates:
+
+    payload = body.model_dump(exclude_unset=True)
+    owner_name = payload.pop("owner_name", None)
+    phone_number = payload.pop("phone_number", None)
+
+    # Re-resolve owner if either field is present in the request
+    if "owner_name" in body.model_fields_set or "phone_number" in body.model_fields_set:
+        effective_name = owner_name if "owner_name" in body.model_fields_set else (
+            disc.owner.name if disc.owner else None
+        )
+        effective_phone = phone_number if "phone_number" in body.model_fields_set else (
+            disc.owner.phone_number if disc.owner else None
+        )
+        if effective_name and effective_phone:
+            new_owner = await OwnerRepository(db).resolve_or_create(
+                name=effective_name, phone_number=effective_phone
+            )
+            payload["owner_id"] = new_owner.id
+        else:
+            payload["owner_id"] = None
+
+    if not payload:
         raise HTTPException(status_code=422, detail="No fields provided for update")
-    await repo.update(disc, **updates)
+
+    await repo.update(disc, **payload)
     await db.commit()
-    disc = await repo.get_by_id(disc_id)
-    return disc
+    return await repo.get_by_id(disc_id)
 
 
 @router.delete("/{disc_id}", status_code=204, operation_id="deleteDisc")

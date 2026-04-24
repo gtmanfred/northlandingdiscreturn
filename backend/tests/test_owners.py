@@ -155,3 +155,57 @@ async def test_disc_repo_list_by_owner_ids(db):
     wish = await repo.list_wishlist_by_owner_ids([o1.id, o2.id])
     assert {d.id for d in found} == {d1.id}
     assert {d.id for d in wish} == {d2.id}
+
+
+from sqlalchemy import select
+from app.models.pickup_event import SMSJob
+
+
+async def test_heads_up_enqueued_on_first_found_disc(db):
+    from app.services.heads_up import maybe_enqueue_heads_up
+    from app.repositories.owner import OwnerRepository
+
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Iris", phone_number="+15558000001"
+    )
+    await db.commit()
+
+    sent = await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    await db.commit()
+    assert sent is True
+    await db.refresh(owner)
+    assert owner.heads_up_sent_at is not None
+
+    jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
+    assert len(jobs) == 1
+    assert "North Landing Disc Return" in jobs[0].message
+
+
+async def test_heads_up_not_re_enqueued(db):
+    from app.services.heads_up import maybe_enqueue_heads_up
+    from app.repositories.owner import OwnerRepository
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Jay", phone_number="+15558000002"
+    )
+    await db.commit()
+    await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    await db.commit()
+    sent_again = await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    await db.commit()
+    assert sent_again is False
+    jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
+    assert len(jobs) == 1
+
+
+async def test_heads_up_not_enqueued_for_wishlist(db):
+    from app.services.heads_up import maybe_enqueue_heads_up
+    from app.repositories.owner import OwnerRepository
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Kay", phone_number="+15558000003"
+    )
+    await db.commit()
+    sent = await maybe_enqueue_heads_up(owner=owner, is_found=False, db=db)
+    await db.commit()
+    assert sent is False
+    await db.refresh(owner)
+    assert owner.heads_up_sent_at is None
