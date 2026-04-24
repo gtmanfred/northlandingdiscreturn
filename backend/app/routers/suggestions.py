@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user, require_admin
 from app.models.disc import Disc
+from app.models.owner import Owner
 from app.models.user import PhoneNumber, User
 
 router = APIRouter()
@@ -19,8 +20,13 @@ async def get_suggestions(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[str]:
-    if field == "owner_name" and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin required")
+    if field == "owner_name":
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Admin required")
+        subq = select(distinct(Owner.name).label("val")).subquery()
+        result = await db.execute(select(subq.c.val).order_by(func.lower(subq.c.val)))
+        return [row[0] for row in result.all()]
+
     col = getattr(Disc, field)
     subq = (
         select(distinct(col).label("val"))
@@ -28,9 +34,7 @@ async def get_suggestions(
         .where(col != "")
         .subquery()
     )
-    result = await db.execute(
-        select(subq.c.val).order_by(func.lower(subq.c.val))
-    )
+    result = await db.execute(select(subq.c.val).order_by(func.lower(subq.c.val)))
     return [row[0] for row in result.all()]
 
 
@@ -60,14 +64,11 @@ async def get_phone_suggestions(
         for row in registered_result.all()
     }
 
-    # Phone numbers from past disc records for this owner
-    disc_result = await db.execute(
-        select(distinct(Disc.phone_number))
-        .where(Disc.owner_name.ilike(owner_name))
-        .where(Disc.phone_number.is_not(None))
-        .where(Disc.phone_number != "")
+    # Phone numbers from existing owner records matching this name
+    owner_result = await db.execute(
+        select(distinct(Owner.phone_number)).where(Owner.name.ilike(owner_name))
     )
-    for (number,) in disc_result.all():
+    for (number,) in owner_result.all():
         if number not in registered:
             registered[number] = PhoneSuggestion(number=number, label=number)
 
