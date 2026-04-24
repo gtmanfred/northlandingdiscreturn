@@ -209,3 +209,44 @@ async def test_heads_up_not_enqueued_for_wishlist(db):
     assert sent is False
     await db.refresh(owner)
     assert owner.heads_up_sent_at is None
+
+
+async def test_notification_groups_by_owner(db):
+    from datetime import date, datetime, timezone
+    from app.repositories.owner import OwnerRepository
+    from app.repositories.disc import DiscRepository
+    from app.repositories.pickup_event import PickupEventRepository
+    from app.services.notification import enqueue_pickup_notifications
+    from app.models.pickup_event import SMSJob
+    from sqlalchemy import select
+
+    o1 = await OwnerRepository(db).resolve_or_create(
+        name="Leo", phone_number="+15559000001"
+    )
+    o2 = await OwnerRepository(db).resolve_or_create(
+        name="Mia", phone_number="+15559000002"
+    )
+    disc_repo = DiscRepository(db)
+    await disc_repo.create(manufacturer="i", name="n", color="r",
+                           input_date=date(2026,4,1), owner_id=o1.id)
+    await disc_repo.create(manufacturer="i", name="n", color="g",
+                           input_date=date(2026,4,1), owner_id=o1.id)
+    await disc_repo.create(manufacturer="d", name="b", color="y",
+                           input_date=date(2026,4,1), owner_id=o2.id)
+    event = await PickupEventRepository(db).create_event(
+        start_at=datetime(2026, 5, 1, 20, 0, tzinfo=timezone.utc),
+        end_at=datetime(2026, 5, 1, 22, 0, tzinfo=timezone.utc),
+        notes=None,
+    )
+    await db.commit()
+
+    sms_count, disc_count = await enqueue_pickup_notifications(event, db)
+    await db.commit()
+    assert disc_count == 3
+    assert sms_count == 2  # one per owner
+
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    # Exclude any heads-up jobs (there shouldn't be any here since owners were
+    # created via the repo, not the admin create flow).
+    phones = sorted(j.phone_number for j in jobs)
+    assert phones == ["+15559000001", "+15559000002"]
