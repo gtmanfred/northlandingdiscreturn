@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, UniqueConstraint, Index, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from app.models.base import Base
 
@@ -29,4 +29,4 @@ class Owner(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # discs relationship added in Task 3 when Disc.owner is defined
+    discs: Mapped[list["Disc"]] = relationship(back_populates="owner")
