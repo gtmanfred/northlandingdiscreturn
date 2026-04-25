@@ -4,6 +4,7 @@ import pytest
 from datetime import date, datetime, timedelta, timezone
 from app.repositories.pickup_event import PickupEventRepository
 from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
 from app.services.auth import create_access_token
 from app.repositories.user import UserRepository
 
@@ -31,9 +32,12 @@ async def test_list_pickup_events(db):
 async def test_create_disc_notification(db):
     disc_repo = DiscRepository(db)
     event_repo = PickupEventRepository(db)
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Boss Owner", phone_number="+15551234567"
+    )
     disc = await disc_repo.create(
         manufacturer="Innova", name="Boss", color="Blue",
-        input_date=date.today(), phone_number="+15551234567"
+        input_date=date.today(), owner_id=owner.id,
     )
     event = await event_repo.create_event(**_window(3))
     notif = await event_repo.create_disc_notification(
@@ -46,9 +50,12 @@ async def test_create_disc_notification(db):
 async def test_count_prior_notifications(db):
     disc_repo = DiscRepository(db)
     event_repo = PickupEventRepository(db)
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Wraith Owner", phone_number="+15559999999"
+    )
     disc = await disc_repo.create(
         manufacturer="Innova", name="Wraith", color="Green",
-        input_date=date.today(), phone_number="+15559999999"
+        input_date=date.today(), owner_id=owner.id,
     )
     for i in range(3):
         event = await event_repo.create_event(**_window(i))
@@ -107,9 +114,12 @@ async def test_create_pickup_event_endpoint(client, db):
 async def test_notify_pickup_event(client, db):
     admin = await make_admin_user(db)
     disc_repo = DiscRepository(db)
+    owner = await OwnerRepository(db).resolve_or_create(
+        name="Notify Owner", phone_number="+15551112222"
+    )
     await disc_repo.create(
         manufacturer="Innova", name="Wraith", color="Blue",
-        input_date=date.today(), phone_number="+15551112222", is_found=True
+        input_date=date.today(), owner_id=owner.id, is_found=True,
     )
     await db.commit()
 

@@ -1,6 +1,7 @@
 import uuid
 from datetime import date
 from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
 from app.repositories.user import UserRepository
 from app.services.auth import create_access_token
 
@@ -59,10 +60,11 @@ async def test_suggestions_owner_name_requires_admin(db, client):
 
 async def test_suggestions_owner_name_admin_succeeds(db, client):
     admin = await make_user(db, is_admin=True)
-    disc_repo = DiscRepository(db)
-    await disc_repo.create(manufacturer="Innova", name="Boss", color="Blue", input_date=date.today(), owner_name="Alice")
-    await disc_repo.create(manufacturer="Discraft", name="Buzzz", color="Red", input_date=date.today(), owner_name="Bob")
-    await disc_repo.create(manufacturer="MVP", name="Atom", color="Green", input_date=date.today(), owner_name="Alice")
+    owner_repo = OwnerRepository(db)
+    await owner_repo.resolve_or_create(name="Alice", phone_number="+15551110001")
+    await owner_repo.resolve_or_create(name="Bob", phone_number="+15552220001")
+    # Duplicate name — should appear only once
+    await owner_repo.resolve_or_create(name="Alice", phone_number="+15551110002")
 
     resp = await client.get("/suggestions?field=owner_name", headers=auth_headers(admin.id))
     assert resp.status_code == 200
@@ -77,19 +79,10 @@ async def test_phone_suggestions_requires_admin(db, client):
 
 async def test_phone_suggestions_from_disc_records(db, client):
     admin = await make_user(db, is_admin=True)
-    disc_repo = DiscRepository(db)
-    await disc_repo.create(
-        manufacturer="Innova", name="Boss", color="Blue",
-        input_date=date.today(), owner_name="Alice", phone_number="+15551112222"
-    )
-    await disc_repo.create(
-        manufacturer="Discraft", name="Buzzz", color="Red",
-        input_date=date.today(), owner_name="Alice", phone_number="+15553334444"
-    )
-    await disc_repo.create(
-        manufacturer="MVP", name="Atom", color="Green",
-        input_date=date.today(), owner_name="Bob", phone_number="+15559998888"
-    )
+    owner_repo = OwnerRepository(db)
+    await owner_repo.resolve_or_create(name="Alice", phone_number="+15551112222")
+    await owner_repo.resolve_or_create(name="Alice", phone_number="+15553334444")
+    await owner_repo.resolve_or_create(name="Bob", phone_number="+15559998888")
 
     resp = await client.get("/suggestions/phone?owner_name=Alice", headers=auth_headers(admin.id))
     assert resp.status_code == 200
@@ -116,16 +109,14 @@ async def test_phone_suggestions_from_registered_users(db, client):
 async def test_phone_suggestions_deduplicates_registered_wins(db, client):
     admin = await make_user(db, is_admin=True)
     user_repo = UserRepository(db)
-    disc_repo = DiscRepository(db)
+    owner_repo = OwnerRepository(db)
 
     owner = await user_repo.create(name="Alice", email="alice@example.com", google_id="google-alice-dedup")
     phone = await user_repo.add_phone_number(owner.id, "+15550001111")
     await user_repo.verify_phone(phone.id)
 
-    await disc_repo.create(
-        manufacturer="Innova", name="Boss", color="Blue",
-        input_date=date.today(), owner_name="Alice", phone_number="+15550001111"
-    )
+    # Same phone number also in owners table
+    await owner_repo.resolve_or_create(name="Alice", phone_number="+15550001111")
 
     resp = await client.get("/suggestions/phone?owner_name=Alice", headers=auth_headers(admin.id))
     assert resp.status_code == 200

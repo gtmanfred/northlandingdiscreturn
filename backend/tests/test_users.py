@@ -5,6 +5,7 @@ import pytest
 from datetime import date
 from app.repositories.user import UserRepository
 from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
 from app.services.auth import create_access_token
 
 
@@ -156,10 +157,11 @@ async def test_get_my_wishlist(client, db):
     await repo.verify_phone(phone.id)
     await db.commit()
 
+    owner = await OwnerRepository(db).resolve_or_create(name="Wish", phone_number="+15550001234")
     disc_repo = DiscRepository(db)
     await disc_repo.create(
         manufacturer="Innova", name="Teebird", color="Pink",
-        input_date=date.today(), phone_number="+15550001234", is_found=False
+        input_date=date.today(), owner_id=owner.id, is_found=False
     )
     await db.commit()
 
@@ -172,12 +174,46 @@ async def test_get_my_wishlist(client, db):
 async def test_add_wishlist_disc(client, db):
     repo = UserRepository(db)
     user = await repo.create(name="WishAdd", email="wishadd@test.com", google_id="g-wishadd")
+    phone = await repo.add_phone_number(user.id, "+15559990001")
+    await repo.verify_phone(phone.id)
     await db.commit()
 
     resp = await client.post(
         "/users/me/wishlist",
-        json={"manufacturer": "Discraft", "name": "Buzzz", "color": "White"},
+        json={"manufacturer": "Discraft", "name": "Buzzz", "color": "White",
+              "phone_number": "+15559990001"},
         headers=auth_headers(user.id),
     )
     assert resp.status_code == 201
     assert resp.json()["is_found"] is False
+    assert resp.json()["owner"]["phone_number"] == "+15559990001"
+
+
+async def test_wishlist_add_resolves_owner_no_heads_up(client, db):
+    from sqlalchemy import select
+    from app.models.pickup_event import SMSJob
+    from app.models.owner import Owner
+
+    # Create user and verify a phone
+    repo = UserRepository(db)
+    user = await repo.create(name="WishOwner", email="wishowner@test.com", google_id="g-wishowner")
+    phone = await repo.add_phone_number(user.id, "+15551112222")
+    await repo.verify_phone(phone.id)
+    await db.commit()
+
+    resp = await client.post(
+        "/users/me/wishlist",
+        headers=auth_headers(user.id),
+        json={"phone_number": "+15551112222", "manufacturer": "Innova",
+              "name": "Leopard", "color": "blue"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["owner"]["phone_number"] == "+15551112222"
+
+    # No SMS jobs for wishlist
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert jobs == []
+
+    # Owner row exists and is marked "not yet contacted"
+    owner = (await db.execute(select(Owner))).scalar_one()
+    assert owner.heads_up_sent_at is None

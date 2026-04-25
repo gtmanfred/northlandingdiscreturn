@@ -48,17 +48,14 @@ export interface DiscCreate {
   is_found?: boolean;
 }
 
-export type DiscOutOwnerName = string | null;
-
-export type DiscOutPhoneNumber = string | null;
+export type DiscOutOwner = OwnerOut | null;
 
 export interface DiscOut {
   id: string;
   manufacturer: string;
   name: string;
   color: string;
-  owner_name: DiscOutOwnerName;
-  phone_number: DiscOutPhoneNumber;
+  owner: DiscOutOwner;
   is_clear: boolean;
   input_date: string;
   is_found: boolean;
@@ -67,6 +64,14 @@ export interface DiscOut {
   photos?: DiscPhotoOut[];
   created_at: string;
   updated_at: string;
+}
+
+export interface OwnerOut {
+  id: string;
+  name: string;
+  phone_number: string;
+  heads_up_sent_at?: string | null;
+  created_at: string;
 }
 
 export interface DiscPage {

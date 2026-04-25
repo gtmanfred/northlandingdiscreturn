@@ -10,6 +10,7 @@ from app.deps import get_current_user
 from app.models.user import User, PhoneNumber
 from app.repositories.user import UserRepository
 from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
 from app.schemas.user import UserOut, PhoneNumberOut, AddPhoneRequest, VerifyPhoneRequest
 from app.schemas.disc import DiscOut, WishlistDiscCreate
 from app.services.auth import generate_verification_code, send_verification_sms
@@ -92,13 +93,10 @@ async def get_my_wishlist(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    user_repo = UserRepository(db)
-    phones = await user_repo.get_verified_numbers(current_user.id)
+    phones = await UserRepository(db).get_verified_numbers(current_user.id)
     numbers = [p.number for p in phones]
-    if not numbers:
-        return []
-    disc_repo = DiscRepository(db)
-    return await disc_repo.list_wishlist_by_phones(numbers)
+    owners = await OwnerRepository(db).list_by_phones(numbers)
+    return await DiscRepository(db).list_wishlist_by_owner_ids([o.id for o in owners])
 
 
 @router.get("/me/discs", response_model=list[DiscOut], operation_id="getMyDiscs")
@@ -106,13 +104,10 @@ async def get_my_discs(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    user_repo = UserRepository(db)
-    phones = await user_repo.get_verified_numbers(current_user.id)
+    phones = await UserRepository(db).get_verified_numbers(current_user.id)
     numbers = [p.number for p in phones]
-    if not numbers:
-        return []
-    disc_repo = DiscRepository(db)
-    return await disc_repo.list_found_by_phones(numbers)
+    owners = await OwnerRepository(db).list_by_phones(numbers)
+    return await DiscRepository(db).list_found_by_owner_ids([o.id for o in owners])
 
 
 @router.post("/me/wishlist", response_model=DiscOut, status_code=201, operation_id="addWishlistDisc")
@@ -121,25 +116,24 @@ async def add_wishlist_disc(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    user_repo = UserRepository(db)
-    phones = await user_repo.get_verified_numbers(current_user.id)
-    verified_numbers = {p.number for p in phones}
-    if not verified_numbers:
-        raise HTTPException(status_code=400, detail="No verified phone number on account")
-    if body.phone_number not in verified_numbers:
+    verified = await UserRepository(db).get_verified_numbers(current_user.id)
+    verified_strs = [p.number for p in verified]
+    if body.phone_number not in verified_strs:
         raise HTTPException(status_code=400, detail="Phone number not verified on your account")
-    disc_repo = DiscRepository(db)
-    disc = await disc_repo.create(
-        manufacturer=body.manufacturer or "Unknown",
-        name=body.name or "Unknown",
-        color=body.color or "Unknown",
+    owner_name = body.owner_name or current_user.name
+    owner = await OwnerRepository(db).resolve_or_create(
+        name=owner_name, phone_number=body.phone_number
+    )
+    disc = await DiscRepository(db).create(
+        manufacturer=body.manufacturer or "",
+        name=body.name or "",
+        color=body.color or "",
         input_date=date.today(),
-        phone_number=body.phone_number,
-        owner_name=body.owner_name or current_user.name,
+        owner_id=owner.id,
         is_found=False,
     )
     await db.commit()
-    return await disc_repo.get_by_id(disc.id)
+    return await DiscRepository(db).get_by_id(disc.id)
 
 
 @router.delete("/me/wishlist/{disc_id}", status_code=204, operation_id="removeWishlistDisc")
@@ -148,12 +142,13 @@ async def remove_wishlist_disc(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    user_repo = UserRepository(db)
-    phones = await user_repo.get_verified_numbers(current_user.id)
+    phones = await UserRepository(db).get_verified_numbers(current_user.id)
     numbers = [p.number for p in phones]
+    owners = await OwnerRepository(db).list_by_phones(numbers)
+    owner_ids = {o.id for o in owners}
     disc_repo = DiscRepository(db)
     disc = await disc_repo.get_by_id(disc_id)
-    if disc is None or disc.is_found or disc.phone_number not in numbers:
+    if disc is None or disc.is_found or disc.owner_id not in owner_ids:
         raise HTTPException(status_code=404, detail="Wishlist disc not found")
     await disc_repo.delete(disc_id)
     await db.commit()

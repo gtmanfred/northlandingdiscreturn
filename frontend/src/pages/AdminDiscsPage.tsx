@@ -212,9 +212,9 @@ export function AdminDiscsPage() {
                       <p className="font-medium text-foreground">{disc.name}</p>
                       <p className="text-sm text-muted-foreground">{disc.manufacturer}</p>
                       <p className="text-sm text-muted-foreground">{disc.color}</p>
-                      {disc.owner_name && <p className="text-sm">{disc.owner_name}</p>}
-                      {disc.phone_number && (
-                        <p className="text-sm text-muted-foreground">{disc.phone_number}</p>
+                      {disc.owner?.name && <p className="text-sm">{disc.owner.name}</p>}
+                      {disc.owner?.phone_number && (
+                        <p className="text-sm text-muted-foreground">{disc.owner.phone_number}</p>
                       )}
                     </div>
                   </div>
@@ -287,8 +287,8 @@ export function AdminDiscsPage() {
                         <div className="text-muted-foreground">{disc.manufacturer}</div>
                       </TableCell>
                       <TableCell>{disc.color}</TableCell>
-                      <TableCell>{disc.phone_number ?? '—'}</TableCell>
-                      <TableCell>{disc.owner_name ?? '—'}</TableCell>
+                      <TableCell>{disc.owner?.phone_number ?? '—'}</TableCell>
+                      <TableCell>{disc.owner?.name ?? '—'}</TableCell>
                       <TableCell>
                         <FoundToggle
                           isFound={disc.is_found}
