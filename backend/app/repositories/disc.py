@@ -21,6 +21,7 @@ class DiscRepository:
         owner_id: uuid.UUID | None = None,
         is_clear: bool = False,
         is_found: bool = True,
+        notes: str | None = None,
     ) -> Disc:
         disc = Disc(
             manufacturer=manufacturer,
@@ -30,6 +31,7 @@ class DiscRepository:
             owner_id=owner_id,
             is_clear=is_clear,
             is_found=is_found,
+            notes=notes,
         )
         self.db.add(disc)
         await self.db.flush()

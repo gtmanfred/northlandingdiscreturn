@@ -66,9 +66,15 @@ async def create_disc(
     repo = DiscRepository(db)
     owner_id = None
     owner_obj = None
-    if body.owner_name and body.phone_number:
+    if (
+        body.owner_first_name is not None
+        and body.owner_last_name is not None
+        and body.phone_number
+    ):
         owner_obj = await OwnerRepository(db).resolve_or_create(
-            name=body.owner_name, phone_number=body.phone_number
+            first_name=body.owner_first_name,
+            last_name=body.owner_last_name,
+            phone_number=body.phone_number,
         )
         owner_id = owner_obj.id
 
@@ -80,13 +86,13 @@ async def create_disc(
         owner_id=owner_id,
         is_clear=body.is_clear,
         is_found=body.is_found,
+        notes=body.notes,
     )
 
     if owner_obj is not None:
         await maybe_enqueue_heads_up(owner=owner_obj, is_found=disc.is_found, db=db)
 
     await db.commit()
-    # Reload with owner + photos for the response
     return await repo.get_by_id(disc.id)
 
 
@@ -103,20 +109,24 @@ async def update_disc(
         raise HTTPException(status_code=404, detail="Disc not found")
 
     payload = body.model_dump(exclude_unset=True)
-    owner_name = payload.pop("owner_name", None)
-    phone_number = payload.pop("phone_number", None)
+    owner_first = payload.pop("owner_first_name", None)
+    owner_last = payload.pop("owner_last_name", None)
+    phone = payload.pop("phone_number", None)
 
-    # Re-resolve owner if either field is present in the request
-    if "owner_name" in body.model_fields_set or "phone_number" in body.model_fields_set:
-        effective_name = owner_name if "owner_name" in body.model_fields_set else (
-            disc.owner.name if disc.owner else None
-        )
-        effective_phone = phone_number if "phone_number" in body.model_fields_set else (
-            disc.owner.phone_number if disc.owner else None
-        )
-        if effective_name and effective_phone:
+    fields_set = body.model_fields_set
+    owner_fields_touched = bool(
+        fields_set & {"owner_first_name", "owner_last_name", "phone_number"}
+    )
+    if owner_fields_touched:
+        cur = disc.owner
+        eff_first = owner_first if "owner_first_name" in fields_set else (cur.first_name if cur else None)
+        eff_last = owner_last if "owner_last_name" in fields_set else (cur.last_name if cur else None)
+        eff_phone = phone if "phone_number" in fields_set else (cur.phone_number if cur else None)
+        if eff_first is not None and eff_last is not None and eff_phone:
             new_owner = await OwnerRepository(db).resolve_or_create(
-                name=effective_name, phone_number=effective_phone
+                first_name=eff_first,
+                last_name=eff_last,
+                phone_number=eff_phone,
             )
             payload["owner_id"] = new_owner.id
         else:
