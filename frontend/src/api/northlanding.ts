@@ -47,22 +47,30 @@ export interface BodyUploadDiscPhoto {
   file: Blob;
 }
 
-export type DiscCreateOwnerName = string | null;
+export type DiscCreateOwnerFirstName = string | null;
+
+export type DiscCreateOwnerLastName = string | null;
 
 export type DiscCreatePhoneNumber = string | null;
+
+export type DiscCreateNotes = string | null;
 
 export interface DiscCreate {
   manufacturer: string;
   name: string;
   color: string;
   input_date: string;
-  owner_name?: DiscCreateOwnerName;
+  owner_first_name?: DiscCreateOwnerFirstName;
+  owner_last_name?: DiscCreateOwnerLastName;
   phone_number?: DiscCreatePhoneNumber;
+  notes?: DiscCreateNotes;
   is_clear?: boolean;
   is_found?: boolean;
 }
 
 export type DiscOutOwner = OwnerOut | null;
+
+export type DiscOutNotes = string | null;
 
 export interface DiscOut {
   id: string;
@@ -75,6 +83,7 @@ export interface DiscOut {
   is_found: boolean;
   is_returned: boolean;
   final_notice_sent: boolean;
+  notes?: DiscOutNotes;
   photos?: DiscPhotoOut[];
   created_at: string;
   updated_at: string;
@@ -99,9 +108,13 @@ export type DiscUpdateName = string | null;
 
 export type DiscUpdateColor = string | null;
 
-export type DiscUpdateOwnerName = string | null;
+export type DiscUpdateOwnerFirstName = string | null;
+
+export type DiscUpdateOwnerLastName = string | null;
 
 export type DiscUpdatePhoneNumber = string | null;
+
+export type DiscUpdateNotes = string | null;
 
 export type DiscUpdateIsClear = boolean | null;
 
@@ -113,8 +126,10 @@ export interface DiscUpdate {
   manufacturer?: DiscUpdateManufacturer;
   name?: DiscUpdateName;
   color?: DiscUpdateColor;
-  owner_name?: DiscUpdateOwnerName;
+  owner_first_name?: DiscUpdateOwnerFirstName;
+  owner_last_name?: DiscUpdateOwnerLastName;
   phone_number?: DiscUpdatePhoneNumber;
+  notes?: DiscUpdateNotes;
   is_clear?: DiscUpdateIsClear;
   is_found?: DiscUpdateIsFound;
   is_returned?: DiscUpdateIsReturned;
@@ -133,10 +148,12 @@ export type OwnerOutHeadsUpSentAt = string | null;
 
 export interface OwnerOut {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   phone_number: string;
   heads_up_sent_at?: OwnerOutHeadsUpSentAt;
   created_at: string;
+  readonly name: string;
 }
 
 export type PhoneNumberOutVerifiedAt = string | null;
@@ -228,14 +245,20 @@ export type WishlistDiscCreateName = string | null;
 
 export type WishlistDiscCreateColor = string | null;
 
-export type WishlistDiscCreateOwnerName = string | null;
+export type WishlistDiscCreateOwnerFirstName = string | null;
+
+export type WishlistDiscCreateOwnerLastName = string | null;
+
+export type WishlistDiscCreateNotes = string | null;
 
 export interface WishlistDiscCreate {
   manufacturer?: WishlistDiscCreateManufacturer;
   name?: WishlistDiscCreateName;
   color?: WishlistDiscCreateColor;
   phone_number: string;
-  owner_name?: WishlistDiscCreateOwnerName;
+  owner_first_name?: WishlistDiscCreateOwnerFirstName;
+  owner_last_name?: WishlistDiscCreateOwnerLastName;
+  notes?: WishlistDiscCreateNotes;
 }
 
 export type ListDiscsParams = {
@@ -258,14 +281,13 @@ export const GetSuggestionsField = {
   manufacturer: 'manufacturer',
   name: 'name',
   color: 'color',
-  owner_name: 'owner_name',
+  owner_first_name: 'owner_first_name',
+  owner_last_name: 'owner_last_name',
 } as const;
 
 export type GetPhoneSuggestionsParams = {
-/**
- * @minLength 1
- */
-owner_name: string;
+owner_first_name?: string;
+owner_last_name?: string;
 };
 
 /**
@@ -2566,7 +2588,7 @@ export function useGetSuggestions<TData = Awaited<ReturnType<typeof getSuggestio
  * @summary Get Phone Suggestions
  */
 export const getPhoneSuggestions = (
-    params: GetPhoneSuggestionsParams,
+    params?: GetPhoneSuggestionsParams,
  signal?: AbortSignal
 ) => {
       
@@ -2588,7 +2610,7 @@ export const getGetPhoneSuggestionsQueryKey = (params?: GetPhoneSuggestionsParam
     }
 
     
-export const getGetPhoneSuggestionsQueryOptions = <TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
+export const getGetPhoneSuggestionsQueryOptions = <TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(params?: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
@@ -2611,7 +2633,7 @@ export type GetPhoneSuggestionsQueryError = ErrorType<HTTPValidationError>
 
 
 export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
- params: GetPhoneSuggestionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>> & Pick<
+ params: undefined |  GetPhoneSuggestionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPhoneSuggestions>>,
           TError,
@@ -2621,7 +2643,7 @@ export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhon
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
- params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>> & Pick<
+ params?: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPhoneSuggestions>>,
           TError,
@@ -2631,7 +2653,7 @@ export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhon
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
- params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
+ params?: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -2639,7 +2661,7 @@ export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhon
  */
 
 export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhoneSuggestions>>, TError = ErrorType<HTTPValidationError>>(
- params: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
+ params?: GetPhoneSuggestionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPhoneSuggestions>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
