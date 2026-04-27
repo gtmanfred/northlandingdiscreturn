@@ -796,6 +796,69 @@
         }
       }
     },
+    "/users/me/api-key": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Get Api Key",
+        "operationId": "get_api_key_users_me_api_key_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Create Api Key",
+        "operationId": "create_api_key_users_me_api_key_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Delete Api Key",
+        "operationId": "delete_api_key_users_me_api_key_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/admin/users": {
       "get": {
         "tags": [
