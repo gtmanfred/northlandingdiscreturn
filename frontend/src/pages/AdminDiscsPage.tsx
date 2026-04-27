@@ -235,6 +235,9 @@ export function AdminDiscsPage() {
                       {disc.owner?.phone_number && (
                         <p className="text-sm text-muted-foreground">{disc.owner.phone_number}</p>
                       )}
+                      {disc.notes && (
+                        <p className="text-sm text-muted-foreground italic">{disc.notes}</p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -279,6 +282,7 @@ export function AdminDiscsPage() {
                     <TableHead>Color</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Owner</TableHead>
+                    <TableHead>Notes</TableHead>
                     <TableHead>Found</TableHead>
                     <TableHead className="text-center">Returned</TableHead>
                     <TableHead>Status</TableHead>
@@ -308,6 +312,9 @@ export function AdminDiscsPage() {
                       <TableCell>{disc.color}</TableCell>
                       <TableCell>{disc.owner?.phone_number ?? '—'}</TableCell>
                       <TableCell>{disc.owner?.name ?? '—'}</TableCell>
+                      <TableCell className="max-w-[16rem] truncate text-muted-foreground" title={disc.notes ?? ''}>
+                        {disc.notes ?? '—'}
+                      </TableCell>
                       <TableCell>
                         <FoundToggle
                           isFound={disc.is_found}
