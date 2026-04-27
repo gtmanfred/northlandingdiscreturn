@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.repositories.user import UserRepository
+from app.models import api_key as _api_key_model  # noqa: F401  ensure metadata registration
 from app.routers import auth, discs, users, admin, webhooks, suggestions, public_calendar
 from app.services.storage import get_storage_client
 
