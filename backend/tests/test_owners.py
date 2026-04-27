@@ -28,7 +28,7 @@ from app.models.disc import Disc
 
 
 async def test_disc_has_owner_relationship(db):
-    owner = Owner(name="Ada", phone_number="+15559990000")
+    owner = Owner(first_name="Ada", last_name="", phone_number="+15559990000")
     db.add(owner)
     await db.flush()
     disc = Disc(
@@ -63,7 +63,7 @@ from app.repositories.owner import OwnerRepository
 
 async def test_repo_resolve_creates_new_owner(db):
     repo = OwnerRepository(db)
-    owner = await repo.resolve_or_create(name="Jill", phone_number="+15551111111")
+    owner = await repo.resolve_or_create(first_name="Jill", last_name="", phone_number="+15551111111")
     assert owner.id is not None
     assert owner.heads_up_sent_at is None
     await db.commit()
@@ -71,17 +71,17 @@ async def test_repo_resolve_creates_new_owner(db):
 
 async def test_repo_resolve_returns_existing_owner(db):
     repo = OwnerRepository(db)
-    first = await repo.resolve_or_create(name="Jack", phone_number="+15552222222")
+    first = await repo.resolve_or_create(first_name="Jack", last_name="", phone_number="+15552222222")
     await db.commit()
-    second = await repo.resolve_or_create(name="Jack", phone_number="+15552222222")
+    second = await repo.resolve_or_create(first_name="Jack", last_name="", phone_number="+15552222222")
     assert first.id == second.id
 
 
 async def test_repo_get_by_phones(db):
     repo = OwnerRepository(db)
-    a = await repo.resolve_or_create(name="A", phone_number="+15553333333")
-    b = await repo.resolve_or_create(name="B", phone_number="+15553333333")
-    await repo.resolve_or_create(name="C", phone_number="+15559999999")
+    a = await repo.resolve_or_create(first_name="A", last_name="", phone_number="+15553333333")
+    b = await repo.resolve_or_create(first_name="B", last_name="", phone_number="+15553333333")
+    await repo.resolve_or_create(first_name="C", last_name="", phone_number="+15559999999")
     await db.commit()
     owners = await repo.list_by_phones(["+15553333333"])
     assert {o.id for o in owners} == {a.id, b.id}
@@ -89,7 +89,7 @@ async def test_repo_get_by_phones(db):
 
 async def test_repo_mark_heads_up_sent(db):
     repo = OwnerRepository(db)
-    owner = await repo.resolve_or_create(name="D", phone_number="+15554444444")
+    owner = await repo.resolve_or_create(first_name="D", last_name="", phone_number="+15554444444")
     await db.commit()
     assert owner.heads_up_sent_at is None
     await repo.mark_heads_up_sent(owner)
@@ -107,7 +107,7 @@ async def test_disc_out_embeds_owner(db):
     from datetime import date
     disc_repo = DiscRepository(db)
     owner = await OwnerRepository(db).resolve_or_create(
-        name="Eva", phone_number="+15555555555"
+        first_name="Eva", last_name="", phone_number="+15555555555"
     )
     disc = await disc_repo.create(
         manufacturer="MVP", name="Wave", color="green",
@@ -117,7 +117,8 @@ async def test_disc_out_embeds_owner(db):
     disc = await disc_repo.get_by_id(disc.id)
     out = DiscOut.model_validate(disc)
     assert out.owner is not None
-    assert out.owner.name == "Eva"
+    assert out.owner.first_name == "Eva"
+    assert out.owner.last_name == ""
     assert out.owner.phone_number == "+15555555555"
 
 
@@ -126,7 +127,7 @@ async def test_disc_repo_create_with_owner_id(db):
     from app.repositories.disc import DiscRepository
     from datetime import date
     owner = await OwnerRepository(db).resolve_or_create(
-        name="Fred", phone_number="+15556666666"
+        first_name="Fred", last_name="", phone_number="+15556666666"
     )
     disc = await DiscRepository(db).create(
         manufacturer="Discraft", name="Buzzz", color="yellow",
@@ -141,8 +142,8 @@ async def test_disc_repo_list_by_owner_ids(db):
     from app.repositories.disc import DiscRepository
     from datetime import date
     repo = DiscRepository(db)
-    o1 = await OwnerRepository(db).resolve_or_create(name="G", phone_number="+15557000001")
-    o2 = await OwnerRepository(db).resolve_or_create(name="H", phone_number="+15557000002")
+    o1 = await OwnerRepository(db).resolve_or_create(first_name="G", last_name="", phone_number="+15557000001")
+    o2 = await OwnerRepository(db).resolve_or_create(first_name="H", last_name="", phone_number="+15557000002")
     d1 = await repo.create(manufacturer="m", name="n", color="c",
                            input_date=date(2026,4,1), owner_id=o1.id)
     d2 = await repo.create(manufacturer="m", name="n", color="c",
@@ -163,7 +164,7 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
     from app.repositories.owner import OwnerRepository
 
     owner = await OwnerRepository(db).resolve_or_create(
-        name="Iris", phone_number="+15558000001"
+        first_name="Iris", last_name="", phone_number="+15558000001"
     )
     await db.commit()
 
@@ -182,7 +183,7 @@ async def test_heads_up_not_re_enqueued(db):
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
     owner = await OwnerRepository(db).resolve_or_create(
-        name="Jay", phone_number="+15558000002"
+        first_name="Jay", last_name="", phone_number="+15558000002"
     )
     await db.commit()
     await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
@@ -198,7 +199,7 @@ async def test_heads_up_not_enqueued_for_wishlist(db):
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
     owner = await OwnerRepository(db).resolve_or_create(
-        name="Kay", phone_number="+15558000003"
+        first_name="Kay", last_name="", phone_number="+15558000003"
     )
     await db.commit()
     sent = await maybe_enqueue_heads_up(owner=owner, is_found=False, db=db)
@@ -218,10 +219,10 @@ async def test_notification_groups_by_owner(db):
     from sqlalchemy import select
 
     o1 = await OwnerRepository(db).resolve_or_create(
-        name="Leo", phone_number="+15559000001"
+        first_name="Leo", last_name="", phone_number="+15559000001"
     )
     o2 = await OwnerRepository(db).resolve_or_create(
-        name="Mia", phone_number="+15559000002"
+        first_name="Mia", last_name="", phone_number="+15559000002"
     )
     disc_repo = DiscRepository(db)
     await disc_repo.create(manufacturer="i", name="n", color="r",
