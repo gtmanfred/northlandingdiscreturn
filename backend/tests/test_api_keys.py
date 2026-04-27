@@ -135,3 +135,77 @@ async def test_api_key_use_updates_last_used_at(client, db):
 
     refreshed = await ApiKeyRepository(db).get_for_user(user.id)
     assert refreshed.last_used_at is not None
+
+
+from app.services.auth import create_access_token
+
+
+def jwt_headers(user_id) -> dict:
+    return {"Authorization": f"Bearer {create_access_token(str(user_id))}"}
+
+
+async def test_post_creates_key_and_returns_plaintext_once(client, db):
+    user = await UserRepository(db).create(name="P", email="p@example.com", google_id="g-p")
+    await db.commit()
+
+    resp = await client.post("/users/me/api-key", headers=jwt_headers(user.id))
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["api_key"].startswith("hou_")
+    assert body["last_four"] == body["api_key"][-4:]
+    assert "created_at" in body
+
+    resp2 = await client.get("/users/me/api-key", headers=jwt_headers(user.id))
+    assert resp2.status_code == 200
+    body2 = resp2.json()
+    assert "api_key" not in body2
+    assert body2["last_four"] == body["last_four"]
+
+
+async def test_post_twice_replaces_existing_key(client, db):
+    user = await UserRepository(db).create(name="P2", email="p2@example.com", google_id="g-p2")
+    await db.commit()
+
+    first = await client.post("/users/me/api-key", headers=jwt_headers(user.id))
+    second = await client.post("/users/me/api-key", headers=jwt_headers(user.id))
+    assert second.status_code == 201
+
+    old_key = first.json()["api_key"]
+    new_key = second.json()["api_key"]
+    assert old_key != new_key
+
+    bad = await client.get("/users/me", headers={"Authorization": f"Bearer {old_key}"})
+    assert bad.status_code == 401
+
+    good = await client.get("/users/me", headers={"Authorization": f"Bearer {new_key}"})
+    assert good.status_code == 200
+
+
+async def test_get_returns_404_when_no_key(client, db):
+    user = await UserRepository(db).create(name="P3", email="p3@example.com", google_id="g-p3")
+    await db.commit()
+    resp = await client.get("/users/me/api-key", headers=jwt_headers(user.id))
+    assert resp.status_code == 404
+
+
+async def test_delete_revokes_key(client, db):
+    user = await UserRepository(db).create(name="P4", email="p4@example.com", google_id="g-p4")
+    await db.commit()
+
+    created = await client.post("/users/me/api-key", headers=jwt_headers(user.id))
+    plaintext = created.json()["api_key"]
+
+    resp = await client.delete("/users/me/api-key", headers=jwt_headers(user.id))
+    assert resp.status_code == 204
+
+    bad = await client.get("/users/me", headers={"Authorization": f"Bearer {plaintext}"})
+    assert bad.status_code == 401
+
+    resp2 = await client.delete("/users/me/api-key", headers=jwt_headers(user.id))
+    assert resp2.status_code == 404
+
+
+async def test_endpoints_require_authentication(client):
+    assert (await client.post("/users/me/api-key")).status_code == 401
+    assert (await client.get("/users/me/api-key")).status_code == 401
+    assert (await client.delete("/users/me/api-key")).status_code == 401

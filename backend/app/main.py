@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal
 from app.repositories.user import UserRepository
 from app.models import api_key as _api_key_model  # noqa: F401  ensure metadata registration
-from app.routers import auth, discs, users, admin, webhooks, suggestions, public_calendar
+from app.routers import auth, discs, users, admin, webhooks, suggestions, public_calendar, api_keys
 from app.services.storage import get_storage_client
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(discs.router, prefix="/discs", tags=["discs"])
     app.include_router(users.router, prefix="/users", tags=["users"])
+    app.include_router(api_keys.router, prefix="/users", tags=["api-keys"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
     app.include_router(suggestions.router, prefix="/suggestions", tags=["suggestions"])
