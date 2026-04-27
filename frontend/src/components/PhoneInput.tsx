@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface PhoneInputProps {
   value: string
@@ -13,6 +13,17 @@ export function PhoneInput({ value, onChange, className = '' }: PhoneInputProps)
 
   const exchangeRef = useRef<HTMLInputElement>(null)
   const lineRef = useRef<HTMLInputElement>(null)
+
+  // Sync internal segments when `value` is set externally (e.g. picking a
+  // phone suggestion or hydrating from an existing record).
+  useEffect(() => {
+    const digits = value.replace(/\D/g, '')
+    if (`${area}${exchange}${line}` === digits) return
+    setArea(digits.slice(0, 3))
+    setExchange(digits.slice(3, 6))
+    setLine(digits.slice(6, 10))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
 
   function extractPart(digits: string, start: number, end: number) {
     const d = digits.replace(/\D/g, '')

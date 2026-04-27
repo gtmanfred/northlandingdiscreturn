@@ -21,6 +21,7 @@ class DiscRepository:
         owner_id: uuid.UUID | None = None,
         is_clear: bool = False,
         is_found: bool = True,
+        notes: str | None = None,
     ) -> Disc:
         disc = Disc(
             manufacturer=manufacturer,
@@ -30,6 +31,7 @@ class DiscRepository:
             owner_id=owner_id,
             is_clear=is_clear,
             is_found=is_found,
+            notes=notes,
         )
         self.db.add(disc)
         await self.db.flush()
@@ -68,7 +70,7 @@ class DiscRepository:
             stmt = stmt.where(Disc.is_returned == is_returned)
         if owner_name is not None:
             stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
-                Owner.name.ilike(f"%{owner_name}%")
+                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
             )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
@@ -109,7 +111,7 @@ class DiscRepository:
         stmt = select(func.count()).select_from(Disc)
         if owner_name is not None:
             stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
-                Owner.name.ilike(f"%{owner_name}%")
+                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
             )
         if is_found is not None:
             stmt = stmt.where(Disc.is_found == is_found)

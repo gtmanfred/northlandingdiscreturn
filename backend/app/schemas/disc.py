@@ -32,6 +32,7 @@ class DiscOut(BaseModel):
     is_found: bool
     is_returned: bool
     final_notice_sent: bool
+    notes: str | None = None
     photos: list[DiscPhotoOut] = []
     created_at: datetime
     updated_at: datetime
@@ -44,8 +45,10 @@ class DiscCreate(BaseModel):
     name: str
     color: str
     input_date: date
-    owner_name: str | None = None
+    owner_first_name: str | None = None
+    owner_last_name: str | None = None
     phone_number: str | None = None
+    notes: str | None = None
     is_clear: bool = False
     is_found: bool = True
 
@@ -56,10 +59,17 @@ class DiscCreate(BaseModel):
 
     @model_validator(mode="after")
     def owner_fields_together(self) -> "DiscCreate":
-        # Allow neither-or-both. A lone name or lone phone is ambiguous.
-        if (self.owner_name is None) != (self.phone_number is None):
+        # All three owner fields are present-or-absent together. Empty-string
+        # last_name is valid (single-token names) when first_name + phone are set.
+        provided = (
+            self.owner_first_name is not None,
+            self.owner_last_name is not None,
+            self.phone_number is not None,
+        )
+        if any(provided) and not all(provided):
             raise ValueError(
-                "owner_name and phone_number must be provided together or not at all"
+                "owner_first_name, owner_last_name, and phone_number must be "
+                "provided together or not at all"
             )
         return self
 
@@ -68,8 +78,10 @@ class DiscUpdate(BaseModel):
     manufacturer: str | None = None
     name: str | None = None
     color: str | None = None
-    owner_name: str | None = None
+    owner_first_name: str | None = None
+    owner_last_name: str | None = None
     phone_number: str | None = None
+    notes: str | None = None
     is_clear: bool | None = None
     is_found: bool | None = None
     is_returned: bool | None = None
@@ -85,7 +97,9 @@ class WishlistDiscCreate(BaseModel):
     name: str | None = None
     color: str | None = None
     phone_number: str
-    owner_name: str | None = None
+    owner_first_name: str | None = None
+    owner_last_name: str | None = None
+    notes: str | None = None
 
     @field_validator("phone_number")
     @classmethod

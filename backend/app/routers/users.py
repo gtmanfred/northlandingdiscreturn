@@ -14,6 +14,7 @@ from app.repositories.owner import OwnerRepository
 from app.schemas.user import UserOut, PhoneNumberOut, AddPhoneRequest, VerifyPhoneRequest
 from app.schemas.disc import DiscOut, WishlistDiscCreate
 from app.services.auth import generate_verification_code, send_verification_sms
+from app.owner_name import parse_owner_name
 
 router = APIRouter()
 
@@ -107,7 +108,11 @@ async def get_my_discs(
     phones = await UserRepository(db).get_verified_numbers(current_user.id)
     numbers = [p.number for p in phones]
     owners = await OwnerRepository(db).list_by_phones(numbers)
-    return await DiscRepository(db).list_found_by_owner_ids([o.id for o in owners])
+    discs = await DiscRepository(db).list_found_by_owner_ids([o.id for o in owners])
+    out = [DiscOut.model_validate(d) for d in discs]
+    for d in out:
+        d.notes = None
+    return out
 
 
 @router.post("/me/wishlist", response_model=DiscOut, status_code=201, operation_id="addWishlistDisc")
@@ -120,9 +125,12 @@ async def add_wishlist_disc(
     verified_strs = [p.number for p in verified]
     if body.phone_number not in verified_strs:
         raise HTTPException(status_code=400, detail="Phone number not verified on your account")
-    owner_name = body.owner_name or current_user.name
+    if body.owner_first_name is not None and body.owner_last_name is not None:
+        first, last = body.owner_first_name, body.owner_last_name
+    else:
+        first, last = parse_owner_name(current_user.name or "")
     owner = await OwnerRepository(db).resolve_or_create(
-        name=owner_name, phone_number=body.phone_number
+        first_name=first, last_name=last, phone_number=body.phone_number
     )
     disc = await DiscRepository(db).create(
         manufacturer=body.manufacturer or "",
@@ -131,6 +139,7 @@ async def add_wishlist_disc(
         input_date=date.today(),
         owner_id=owner.id,
         is_found=False,
+        notes=body.notes,
     )
     await db.commit()
     return await DiscRepository(db).get_by_id(disc.id)

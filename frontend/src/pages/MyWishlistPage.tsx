@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { parseOwnerName } from '../utils/ownerName'
 
 export function MyWishlistPage() {
   const queryClient = useQueryClient()
@@ -30,22 +31,27 @@ export function MyWishlistPage() {
 
   const verifiedNumbers = user?.phone_numbers?.filter((p) => p.verified) ?? []
 
-  const [form, setForm] = useState({ manufacturer: '', name: '', color: '' })
+  const [form, setForm] = useState({ manufacturer: '', name: '', color: '', notes: '' })
   const [selectedPhone, setSelectedPhone] = useState<string>('')
 
   const phoneNumber = selectedPhone || verifiedNumbers[0]?.number || ''
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
+    const { first_name, last_name } = parseOwnerName(user?.name ?? '')
     await addMutation.mutateAsync({
       data: {
-        ...form,
+        manufacturer: form.manufacturer,
+        name: form.name,
+        color: form.color,
         phone_number: phoneNumber,
-        owner_name: user?.name ?? undefined,
+        owner_first_name: first_name,
+        owner_last_name: last_name,
+        notes: form.notes || null,
       },
     })
     queryClient.invalidateQueries({ queryKey: getGetMyWishlistQueryKey() })
-    setForm({ manufacturer: '', name: '', color: '' })
+    setForm({ manufacturer: '', name: '', color: '', notes: '' })
   }
 
   const handleRemove = async (discId: string) => {
@@ -99,6 +105,13 @@ export function MyWishlistPage() {
                 suggestions={colorSuggestions.map((v) => ({ value: v }))}
                 onValueChange={(v) => setForm((f) => ({ ...f, color: v }))}
               />
+              <input
+                type="text"
+                placeholder="Notes (optional)"
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                className={`${inputCls} flex-1 min-w-32`}
+              />
               {verifiedNumbers.length > 1 ? (
                 <Select value={phoneNumber} onValueChange={setSelectedPhone}>
                   <SelectTrigger className="w-44" aria-label="Phone number">
@@ -140,6 +153,9 @@ export function MyWishlistPage() {
                     )}
                     {disc.color && (
                       <span className="ml-2 text-sm text-muted-foreground">· {disc.color}</span>
+                    )}
+                    {disc.notes && (
+                      <span className="ml-2 text-sm text-muted-foreground italic">· {disc.notes}</span>
                     )}
                   </span>
                   <Button

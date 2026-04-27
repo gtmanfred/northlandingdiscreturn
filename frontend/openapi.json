@@ -1312,7 +1312,8 @@
                 "manufacturer",
                 "name",
                 "color",
-                "owner_name"
+                "owner_first_name",
+                "owner_last_name"
               ],
               "type": "string",
               "title": "Field"
@@ -1361,13 +1362,23 @@
         ],
         "parameters": [
           {
-            "name": "owner_name",
+            "name": "owner_first_name",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
-              "minLength": 1,
-              "title": "Owner Name"
+              "default": "",
+              "title": "Owner First Name"
+            }
+          },
+          {
+            "name": "owner_last_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Owner Last Name"
             }
           }
         ],
@@ -1503,7 +1514,7 @@
             "format": "date",
             "title": "Input Date"
           },
-          "owner_name": {
+          "owner_first_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -1512,7 +1523,18 @@
                 "type": "null"
               }
             ],
-            "title": "Owner Name"
+            "title": "Owner First Name"
+          },
+          "owner_last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Last Name"
           },
           "phone_number": {
             "anyOf": [
@@ -1524,6 +1546,17 @@
               }
             ],
             "title": "Phone Number"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "is_clear": {
             "type": "boolean",
@@ -1594,6 +1627,17 @@
           "final_notice_sent": {
             "type": "boolean",
             "title": "Final Notice Sent"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "photos": {
             "items": {
@@ -1720,7 +1764,7 @@
             ],
             "title": "Color"
           },
-          "owner_name": {
+          "owner_first_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -1729,7 +1773,18 @@
                 "type": "null"
               }
             ],
-            "title": "Owner Name"
+            "title": "Owner First Name"
+          },
+          "owner_last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Last Name"
           },
           "phone_number": {
             "anyOf": [
@@ -1741,6 +1796,17 @@
               }
             ],
             "title": "Phone Number"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "is_clear": {
             "anyOf": [
@@ -1817,9 +1883,13 @@
             "format": "uuid",
             "title": "Id"
           },
-          "name": {
+          "first_name": {
             "type": "string",
-            "title": "Name"
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
           },
           "phone_number": {
             "type": "string",
@@ -1841,14 +1911,21 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "readOnly": true
           }
         },
         "type": "object",
         "required": [
           "id",
-          "name",
+          "first_name",
+          "last_name",
           "phone_number",
-          "created_at"
+          "created_at",
+          "name"
         ],
         "title": "OwnerOut"
       },
@@ -2209,7 +2286,7 @@
             "type": "string",
             "title": "Phone Number"
           },
-          "owner_name": {
+          "owner_first_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -2218,7 +2295,29 @@
                 "type": "null"
               }
             ],
-            "title": "Owner Name"
+            "title": "Owner First Name"
+          },
+          "owner_last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Last Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           }
         },
         "type": "object",

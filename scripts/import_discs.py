@@ -17,8 +17,11 @@ Spreadsheet columns (data starts at row 4):
 Behavior:
     * Every non-empty row is imported. Missing string fields become "" and a missing
       Date found falls back to today (the API requires it).
-    * Owner is sent only when Name is a real name (not blank / '?') AND Phone normalizes
-      to a US 10-digit number. Otherwise the disc is created ownerless.
+    * Owner is sent only when Name is a real name AND Phone normalizes to a US
+      10-digit number. Names containing a comma are split as "first, last" (the
+      first name is in front of the comma); otherwise on the first whitespace
+      run, with single tokens producing an empty last name. Otherwise the disc
+      is created ownerless.
     * is_returned cannot be set on POST /discs; if a Date returned is present we follow up
       with PATCH /discs/{id} {"is_returned": true}.
     * is_clear is inferred from the color text ("clear", "trans", or "tint").
@@ -44,9 +47,25 @@ HEADER_ROW = 3  # 0-indexed; data begins at row index 3 (row 4 in Excel).
 DEFAULT_BASE_URL = "http://localhost:8000"
 
 
+def parse_owner_name(raw: str | None) -> tuple[str, str]:
+    if raw is None:
+        return ("", "")
+    s = raw.strip()
+    if not s:
+        return ("", "")
+    if "," in s:
+        first, _, last = s.partition(",")
+        return (first.strip(), last.strip())
+    parts = s.split(None, 1)
+    if len(parts) == 1:
+        return (parts[0], "")
+    return (parts[0], parts[1].strip())
+
+
 @dataclass
 class ParsedRow:
-    name: str | None
+    first_name: str | None
+    last_name: str | None
     phone: str | None
     manufacturer: str
     model: str
@@ -107,8 +126,14 @@ def parse_row(row: tuple) -> ParsedRow | None:
     color_lower = (color or "").lower()
     is_clear = any(token in color_lower for token in ("clear", "trans", "tint"))
 
+    if _is_real_name(name):
+        first, last = parse_owner_name(name)
+    else:
+        first, last = None, None
+
     return ParsedRow(
-        name=name if _is_real_name(name) else None,
+        first_name=first,
+        last_name=last,
         phone=_try_phone(phone_raw),
         manufacturer=manufacturer or "",
         model=model or "",
@@ -129,8 +154,9 @@ def build_create_payload(parsed: ParsedRow) -> dict:
         "is_clear": parsed.is_clear,
         "is_found": True,
     }
-    if parsed.name and parsed.phone:
-        payload["owner_name"] = parsed.name
+    if parsed.first_name is not None and parsed.last_name is not None and parsed.phone:
+        payload["owner_first_name"] = parsed.first_name
+        payload["owner_last_name"] = parsed.last_name
         payload["phone_number"] = parsed.phone
     return payload
 
@@ -168,7 +194,7 @@ def import_sheet(
             stats["missing_date"] += 1
 
         payload = build_create_payload(parsed)
-        has_owner = "owner_name" in payload
+        has_owner = "owner_first_name" in payload
         if has_owner:
             stats["owners"] += 1
         else:

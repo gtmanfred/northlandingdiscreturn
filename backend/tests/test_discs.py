@@ -33,7 +33,7 @@ async def test_list_all_discs(db):
 async def test_list_discs_by_phone(db):
     from app.repositories.owner import OwnerRepository
     owner_repo = OwnerRepository(db)
-    owner = await owner_repo.resolve_or_create(name="Atom Owner", phone_number="+15551111111")
+    owner = await owner_repo.resolve_or_create(first_name="Atom", last_name="Owner", phone_number="+15551111111")
     await db.flush()
     repo = DiscRepository(db)
     await repo.create(
@@ -84,9 +84,9 @@ async def test_add_and_delete_photo(db):
 async def test_list_unreturned_found(db):
     from app.repositories.owner import OwnerRepository
     owner_repo = OwnerRepository(db)
-    o1 = await owner_repo.resolve_or_create(name="OA", phone_number="+15550000001")
-    o2 = await owner_repo.resolve_or_create(name="OB", phone_number="+15550000002")
-    o4 = await owner_repo.resolve_or_create(name="OD", phone_number="+15550000004")
+    o1 = await owner_repo.resolve_or_create(first_name="OA", last_name="", phone_number="+15550000001")
+    o2 = await owner_repo.resolve_or_create(first_name="OB", last_name="", phone_number="+15550000002")
+    o4 = await owner_repo.resolve_or_create(first_name="OD", last_name="", phone_number="+15550000004")
     await db.flush()
     repo = DiscRepository(db)
     # Should appear: found, not returned, has owner
@@ -109,9 +109,9 @@ async def test_list_unreturned_found(db):
 async def test_list_by_phones(db):
     from app.repositories.owner import OwnerRepository
     owner_repo = OwnerRepository(db)
-    oE = await owner_repo.resolve_or_create(name="OE", phone_number="+15550000010")
-    oF = await owner_repo.resolve_or_create(name="OF", phone_number="+15550000011")
-    oG = await owner_repo.resolve_or_create(name="OG", phone_number="+15550000099")
+    oE = await owner_repo.resolve_or_create(first_name="OE", last_name="", phone_number="+15550000010")
+    oF = await owner_repo.resolve_or_create(first_name="OF", last_name="", phone_number="+15550000011")
+    oG = await owner_repo.resolve_or_create(first_name="OG", last_name="", phone_number="+15550000099")
     await db.flush()
     repo = DiscRepository(db)
     await repo.create(manufacturer="X", name="E", color="W", input_date=date.today(), owner_id=oE.id)
@@ -150,8 +150,8 @@ async def test_list_all_is_found_false(db):
 async def test_list_all_owner_name_filter(db):
     from app.repositories.owner import OwnerRepository
     owner_repo = OwnerRepository(db)
-    oA = await owner_repo.resolve_or_create(name="Alice Smith", phone_number="+15550001001")
-    oB = await owner_repo.resolve_or_create(name="Bob Jones", phone_number="+15550001002")
+    oA = await owner_repo.resolve_or_create(first_name="Alice", last_name="Smith", phone_number="+15550001001")
+    oB = await owner_repo.resolve_or_create(first_name="Bob", last_name="Jones", phone_number="+15550001002")
     await db.flush()
     repo = DiscRepository(db)
     await repo.create(manufacturer="X", name="D1", color="W", input_date=date.today(), owner_id=oA.id)
@@ -165,8 +165,8 @@ async def test_list_all_owner_name_filter(db):
 async def test_list_all_combined_filters(db):
     from app.repositories.owner import OwnerRepository
     owner_repo = OwnerRepository(db)
-    oC = await owner_repo.resolve_or_create(name="Carol", phone_number="+15550002001")
-    oD = await owner_repo.resolve_or_create(name="Dave", phone_number="+15550002002")
+    oC = await owner_repo.resolve_or_create(first_name="Carol", last_name="", phone_number="+15550002001")
+    oD = await owner_repo.resolve_or_create(first_name="Dave", last_name="", phone_number="+15550002002")
     await db.flush()
     repo = DiscRepository(db)
     await repo.create(manufacturer="X", name="Match", color="W", input_date=date.today(), is_found=True, owner_id=oC.id)
@@ -239,8 +239,8 @@ async def test_admin_list_discs_owner_name_filter(client, db):
     from app.repositories.owner import OwnerRepository
     admin = await make_admin(db, name="Admin5", email="admin5@example.com", google_id="g-admin5")
     owner_repo = OwnerRepository(db)
-    oA = await owner_repo.resolve_or_create(name="Alice", phone_number="+15550003001")
-    oB = await owner_repo.resolve_or_create(name="Bob", phone_number="+15550003002")
+    oA = await owner_repo.resolve_or_create(first_name="Alice", last_name="", phone_number="+15550003001")
+    oB = await owner_repo.resolve_or_create(first_name="Bob", last_name="", phone_number="+15550003002")
     repo = DiscRepository(db)
     await repo.create(manufacturer="X", name="AliceDisc", color="W", input_date=date.today(), owner_id=oA.id)
     await repo.create(manufacturer="X", name="BobDisc", color="W", input_date=date.today(), owner_id=oB.id)
@@ -316,7 +316,8 @@ async def test_admin_create_disc_enqueues_heads_up(db, client):
             "name": "Destroyer",
             "color": "red",
             "input_date": "2026-04-01",
-            "owner_name": "New Owner",
+            "owner_first_name": "New",
+            "owner_last_name": "Owner",
             "phone_number": "5551234567",
         },
     )
@@ -347,7 +348,8 @@ async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
                 "name": "Destroyer",
                 "color": "red",
                 "input_date": "2026-04-01",
-                "owner_name": "Repeat Owner",
+                "owner_first_name": "Repeat",
+                "owner_last_name": "Owner",
                 "phone_number": "5557778888",
             },
         )
@@ -355,3 +357,22 @@ async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
 
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 1
+
+
+async def test_admin_list_discs_owner_full_name_filter(client, db):
+    """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
+    from app.repositories.owner import OwnerRepository
+    admin = await make_admin(db, name="Admin6", email="admin6@example.com", google_id="g-admin6")
+    owner_repo = OwnerRepository(db)
+    oA = await owner_repo.resolve_or_create(first_name="Alice", last_name="Walker", phone_number="+15550004001")
+    oB = await owner_repo.resolve_or_create(first_name="Alice", last_name="Smith", phone_number="+15550004002")
+    repo = DiscRepository(db)
+    await repo.create(manufacturer="X", name="WalkerDisc", color="W", input_date=date.today(), owner_id=oA.id)
+    await repo.create(manufacturer="X", name="SmithDisc", color="W", input_date=date.today(), owner_id=oB.id)
+    await db.commit()
+
+    resp = await client.get("/discs?owner_name=Alice+Walker", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    names = [d["name"] for d in resp.json()["items"]]
+    assert "WalkerDisc" in names
+    assert "SmithDisc" not in names
