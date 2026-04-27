@@ -3,27 +3,24 @@ from app.models.owner import Owner
 
 
 async def test_owner_model_persists(db):
-    owner = Owner(name="John Smith", phone_number="+15551234567")
+    owner = Owner(first_name="John", last_name="Smith", phone_number="+15551234567")
     db.add(owner)
     await db.flush()
     await db.refresh(owner)
     assert isinstance(owner.id, uuid.UUID)
-    assert owner.name == "John Smith"
+    assert owner.first_name == "John"
+    assert owner.last_name == "Smith"
     assert owner.phone_number == "+15551234567"
     assert owner.heads_up_sent_at is None
     assert owner.created_at is not None
 
 
-async def test_owner_unique_name_phone(db):
-    from sqlalchemy.exc import IntegrityError
-    db.add(Owner(name="Jane", phone_number="+15550001111"))
+async def test_owner_allows_duplicate_triple(db):
+    """Uniqueness is enforced at the application layer, not the DB."""
+    db.add(Owner(first_name="Jane", last_name="Doe", phone_number="+15550001111"))
     await db.flush()
-    db.add(Owner(name="Jane", phone_number="+15550001111"))
-    try:
-        await db.flush()
-        assert False, "should have raised IntegrityError"
-    except IntegrityError:
-        await db.rollback()
+    db.add(Owner(first_name="Jane", last_name="Doe", phone_number="+15550001111"))
+    await db.flush()  # must NOT raise
 
 
 from datetime import date
