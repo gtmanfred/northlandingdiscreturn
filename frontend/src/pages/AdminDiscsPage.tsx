@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
@@ -39,6 +39,7 @@ type Tri = 'all' | 'true' | 'false'
 export function AdminDiscsPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
 
   const [isFoundFilter, setIsFoundFilter] = useState<boolean | undefined>(undefined)
@@ -48,13 +49,17 @@ export function AdminDiscsPage() {
 
   const pageSize = 25
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setOwnerNameFilter(ownerNameInput || undefined)
+  const commitOwnerName = () => {
+    const next = ownerNameInput || undefined
+    if (next !== ownerNameFilter) {
+      setOwnerNameFilter(next)
       setPage(1)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [ownerNameInput])
+    }
+  }
+
+  const commitSearch = () => {
+    if (searchInput !== search) setSearch(searchInput)
+  }
 
   const { data, isLoading } = useListDiscs({
     page,
@@ -164,6 +169,13 @@ export function AdminDiscsPage() {
               placeholder="Owner name…"
               value={ownerNameInput}
               onChange={(e) => setOwnerNameInput(e.target.value)}
+              onBlur={commitOwnerName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitOwnerName()
+                }
+              }}
               className="w-48"
             />
           </div>
@@ -173,8 +185,15 @@ export function AdminDiscsPage() {
               id="filter-search"
               type="search"
               placeholder="Filter…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onBlur={commitSearch}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitSearch()
+                }
+              }}
               className="w-56"
             />
           </div>
