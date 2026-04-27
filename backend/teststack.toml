@@ -8,6 +8,7 @@ tests = "uv run pytest {posargs}"
 
 [tests.environment]
 SECRET_KEY = "test-secret-key-for-tests-only"
+API_KEY_HMAC_SECRET = "test-api-key-hmac-secret"
 GOOGLE_CLIENT_ID = "test-client-id"
 GOOGLE_CLIENT_SECRET = "test-client-secret"
 TWILIO_ACCOUNT_SID = "ACtest"

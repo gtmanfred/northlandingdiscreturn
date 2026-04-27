@@ -10,6 +10,7 @@ import {
 import { PageHeader } from '../components/PageHeader'
 import { LoadingState } from '../components/LoadingState'
 import { PhoneInput } from '../components/PhoneInput'
+import { ApiKeyCard } from '../components/ApiKeyCard'
 import { normalizePhone } from '../utils/phone'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -167,6 +168,8 @@ export function MyProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      <ApiKeyCard />
     </div>
   )
 }
