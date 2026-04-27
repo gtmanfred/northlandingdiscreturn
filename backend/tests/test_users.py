@@ -157,7 +157,7 @@ async def test_get_my_wishlist(client, db):
     await repo.verify_phone(phone.id)
     await db.commit()
 
-    owner = await OwnerRepository(db).resolve_or_create(name="Wish", phone_number="+15550001234")
+    owner = await OwnerRepository(db).resolve_or_create(first_name="Wish", last_name="", phone_number="+15550001234")
     disc_repo = DiscRepository(db)
     await disc_repo.create(
         manufacturer="Innova", name="Teebird", color="Pink",
@@ -217,3 +217,76 @@ async def test_wishlist_add_resolves_owner_no_heads_up(client, db):
     # Owner row exists and is marked "not yet contacted"
     owner = (await db.execute(select(Owner))).scalar_one()
     assert owner.heads_up_sent_at is None
+
+
+async def test_wishlist_disc_persists_notes(client, db):
+    """Notes posted to /me/wishlist round-trip through both POST response and GET listing."""
+    repo = UserRepository(db)
+    user = await repo.create(name="NoteUser", email="noteuser@test.com", google_id="g-noteuser")
+    phone = await repo.add_phone_number(user.id, "+15558880001")
+    await repo.verify_phone(phone.id)
+    await db.commit()
+
+    resp = await client.post(
+        "/users/me/wishlist",
+        headers=auth_headers(user.id),
+        json={
+            "manufacturer": "Innova",
+            "name": "Teebird",
+            "color": "Blue",
+            "phone_number": "+15558880001",
+            "notes": "blue marker on rim",
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["notes"] == "blue marker on rim"
+
+    listing = await client.get("/users/me/wishlist", headers=auth_headers(user.id))
+    assert listing.status_code == 200
+    items = listing.json()
+    assert len(items) == 1
+    assert items[0]["notes"] == "blue marker on rim"
+
+
+async def test_me_discs_strips_notes(client, db):
+    """Admin-created found disc with notes: user GET /me/discs sees notes=null."""
+    from app.services.auth import create_access_token as _tok
+
+    # Create admin
+    admin_repo = UserRepository(db)
+    admin = await admin_repo.create(name="NoteAdmin", email="noteadmin@test.com", google_id="g-noteadmin")
+    admin.is_admin = True
+    await db.flush()
+
+    # Create normal user with verified phone
+    user = await admin_repo.create(name="NoteOwner", email="noteowner@test.com", google_id="g-noteowner")
+    phone = await admin_repo.add_phone_number(user.id, "+15558880002")
+    await admin_repo.verify_phone(phone.id)
+    await db.commit()
+
+    admin_hdrs = {"Authorization": f"Bearer {_tok(str(admin.id))}"}
+    user_hdrs = {"Authorization": f"Bearer {_tok(str(user.id))}"}
+
+    create_resp = await client.post(
+        "/discs",
+        headers=admin_hdrs,
+        json={
+            "manufacturer": "Discraft",
+            "name": "Buzzz",
+            "color": "White",
+            "input_date": str(date.today()),
+            "owner_first_name": "NoteOwner",
+            "owner_last_name": "",
+            "phone_number": "+15558880002",
+            "notes": "crack on the rim",
+            "is_found": True,
+        },
+    )
+    assert create_resp.status_code == 201
+    assert create_resp.json()["notes"] == "crack on the rim"
+
+    my_discs = await client.get("/users/me/discs", headers=user_hdrs)
+    assert my_discs.status_code == 200
+    items = my_discs.json()
+    assert len(items) == 1
+    assert items[0]["notes"] is None
