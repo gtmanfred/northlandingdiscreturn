@@ -15,12 +15,16 @@ async def test_owner_model_persists(db):
     assert owner.created_at is not None
 
 
-async def test_owner_allows_duplicate_triple(db):
-    """Uniqueness is enforced at the application layer, not the DB."""
+async def test_owner_unique_first_last_phone(db):
+    from sqlalchemy.exc import IntegrityError
     db.add(Owner(first_name="Jane", last_name="Doe", phone_number="+15550001111"))
     await db.flush()
     db.add(Owner(first_name="Jane", last_name="Doe", phone_number="+15550001111"))
-    await db.flush()  # must NOT raise
+    try:
+        await db.flush()
+        assert False, "should have raised IntegrityError"
+    except IntegrityError:
+        await db.rollback()
 
 
 from datetime import date

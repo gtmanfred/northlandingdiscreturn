@@ -40,9 +40,8 @@ attach a note describing the disc, visible to admins.
 - Add `first_name VARCHAR NOT NULL`.
 - Add `last_name VARCHAR NOT NULL DEFAULT ''` (empty string for
   single-token names like "Cher").
-- Drop the existing `(name, phone_number)` unique constraint and do
-  **not** replace it. Owners are deduped at the application layer only
-  (see *Owner Resolution*).
+- Replace the existing `(name, phone_number)` unique constraint with
+  `uq_owners_first_last_phone` on `(first_name, last_name, phone_number)`.
 - Drop the existing `ix_owners_name` index. Add a composite index on
   `(last_name, first_name)` to support autocomplete and sorted listing.
 
@@ -60,9 +59,12 @@ For each row in `owners`:
   - `"Cher"` → `first_name="Cher"`, `last_name=""`.
 - Drop `name`.
 
-Then drop `ix_owners_name` and `uq_owners_name_phone`, and create the
-new index. The migration is one Alembic revision; columns and
-constraints change in the same revision.
+Then drop `ix_owners_name` and `uq_owners_name_phone`, create the new
+composite index, dedup any rows that collapse to the same
+`(first_name, last_name, phone_number)` triple (keep the oldest, repoint
+its `discs.owner_id` references, delete the rest), and add the
+`uq_owners_first_last_phone` unique constraint. The migration is one
+Alembic revision; columns and constraints change in the same revision.
 
 ## Owner Name Parsing Helper
 
@@ -97,10 +99,10 @@ Used by:
 - If found, return it.
 - Else insert a new row.
 
-There is no DB-level uniqueness; two parallel admin sessions could in
-principle race and create two rows with the same triple. We accept this
-— it's no worse than today's hand-typed name variants and is recoverable
-later by a manual merge.
+The `uq_owners_first_last_phone` unique constraint enforces that there
+is at most one row per triple, so the lookup-then-insert pattern is
+race-safe — a concurrent insert that beats us to it raises
+`IntegrityError`, and the next request resolves to the existing row.
 
 ## Heads-Up SMS
 
@@ -277,10 +279,6 @@ Same rules as the backend helper (comma first, then first space).
 
 ## Open Risks
 
-- **Concurrent owner creation.** Without DB-level uniqueness, two
-  near-simultaneous admin saves of the same `(first, last, phone)`
-  triple could create duplicate rows. Acceptable for now; revisit if
-  it actually happens in practice.
 - **Names with internal commas that aren't separators.** E.g. company
   names like `"Acme, Inc"` would be parsed as `first="Acme"`,
   `last="Inc"`. The owner field is for individuals, so this is

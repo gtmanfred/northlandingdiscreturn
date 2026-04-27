@@ -54,12 +54,49 @@ def upgrade() -> None:
         "ix_owners_last_first", "owners", ["last_name", "first_name"]
     )
 
-    # 6. Disc notes column.
+    # 6. Dedup: backfilling can collapse rows that had differing `name`
+    #    whitespace into the same (first, last, phone) triple. Keep the
+    #    oldest row in each group, repoint its discs, and drop the rest
+    #    so we can add the unique constraint.
+    op.execute(
+        """
+        CREATE TEMP TABLE owner_keepers AS
+        SELECT DISTINCT ON (first_name, last_name, phone_number)
+            id, first_name, last_name, phone_number
+        FROM owners
+        ORDER BY first_name, last_name, phone_number, created_at, id;
+
+        UPDATE discs
+        SET owner_id = k.id
+        FROM owners o
+        JOIN owner_keepers k
+          ON o.first_name = k.first_name
+         AND o.last_name = k.last_name
+         AND o.phone_number = k.phone_number
+        WHERE discs.owner_id = o.id
+          AND o.id <> k.id;
+
+        DELETE FROM owners
+        WHERE id NOT IN (SELECT id FROM owner_keepers);
+
+        DROP TABLE owner_keepers;
+        """
+    )
+
+    # 7. Re-add uniqueness on the new triple.
+    op.create_unique_constraint(
+        "uq_owners_first_last_phone",
+        "owners",
+        ["first_name", "last_name", "phone_number"],
+    )
+
+    # 8. Disc notes column.
     op.add_column("discs", sa.Column("notes", sa.String(), nullable=True))
 
 
 def downgrade() -> None:
     op.drop_column("discs", "notes")
+    op.drop_constraint("uq_owners_first_last_phone", "owners", type_="unique")
     op.drop_index("ix_owners_last_first", table_name="owners")
     op.add_column("owners", sa.Column("name", sa.String(), nullable=True))
     op.execute(

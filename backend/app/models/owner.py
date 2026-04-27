@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, Index, func
+from sqlalchemy import String, DateTime, Index, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from app.models.base import Base
@@ -9,6 +9,12 @@ from app.models.base import Base
 class Owner(Base):
     __tablename__ = "owners"
     __table_args__ = (
+        UniqueConstraint(
+            "first_name",
+            "last_name",
+            "phone_number",
+            name="uq_owners_first_last_phone",
+        ),
         Index("ix_owners_phone_number", "phone_number"),
         Index("ix_owners_last_first", "last_name", "first_name"),
     )
