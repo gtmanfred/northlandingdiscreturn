@@ -23,6 +23,7 @@ async def _user_from_api_key(token: str, db: AsyncSession) -> User | None:
     if user is None:
         return None
     await api_repo.touch_last_used(row.id)
+    await db.commit()
     return user
 
 
