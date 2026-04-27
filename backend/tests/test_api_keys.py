@@ -89,3 +89,49 @@ async def test_repo_touch_last_used_at(db):
     await repo.touch_last_used(row.id)
     refreshed = await repo.get_for_user(user.id)
     assert refreshed.last_used_at is not None
+
+
+from app.auth.api_key import generate_api_key
+
+
+async def test_api_key_authenticates_protected_endpoint(client, db):
+    user_repo = UserRepository(db)
+    user = await user_repo.create(name="ApiUser", email="api@example.com", google_id="g-api")
+    plaintext, key_hash, last_four = generate_api_key()
+    await ApiKeyRepository(db).upsert_for_user(user.id, key_hash=key_hash, last_four=last_four)
+    await db.commit()
+
+    resp = await client.get("/users/me", headers={"Authorization": f"Bearer {plaintext}"})
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "api@example.com"
+
+
+async def test_invalid_api_key_returns_401(client, db):
+    resp = await client.get(
+        "/users/me",
+        headers={"Authorization": "Bearer hou_definitely-not-a-real-key"},
+    )
+    assert resp.status_code == 401
+
+
+async def test_jwt_still_works(client, db):
+    from app.services.auth import create_access_token
+
+    user = await UserRepository(db).create(name="JwtUser", email="jwt@example.com", google_id="g-jwt")
+    await db.commit()
+    headers = {"Authorization": f"Bearer {create_access_token(str(user.id))}"}
+    resp = await client.get("/users/me", headers=headers)
+    assert resp.status_code == 200
+
+
+async def test_api_key_use_updates_last_used_at(client, db):
+    user = await UserRepository(db).create(name="LU", email="lu@example.com", google_id="g-lu")
+    plaintext, key_hash, last_four = generate_api_key()
+    await ApiKeyRepository(db).upsert_for_user(user.id, key_hash=key_hash, last_four=last_four)
+    await db.commit()
+
+    resp = await client.get("/users/me", headers={"Authorization": f"Bearer {plaintext}"})
+    assert resp.status_code == 200
+
+    refreshed = await ApiKeyRepository(db).get_for_user(user.id)
+    assert refreshed.last_used_at is not None
