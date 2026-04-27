@@ -58,14 +58,22 @@ def upgrade() -> None:
     #    whitespace into the same (first, last, phone) triple. Keep the
     #    oldest row in each group, repoint its discs, and drop the rest
     #    so we can add the unique constraint.
+    #
+    #    asyncpg can't run a multi-statement string in a prepared
+    #    statement, so each step is its own op.execute call. The TEMP
+    #    table is session-scoped and persists across executes inside the
+    #    migration's single transaction.
     op.execute(
         """
         CREATE TEMP TABLE owner_keepers AS
         SELECT DISTINCT ON (first_name, last_name, phone_number)
             id, first_name, last_name, phone_number
         FROM owners
-        ORDER BY first_name, last_name, phone_number, created_at, id;
-
+        ORDER BY first_name, last_name, phone_number, created_at, id
+        """
+    )
+    op.execute(
+        """
         UPDATE discs
         SET owner_id = k.id
         FROM owners o
@@ -74,14 +82,13 @@ def upgrade() -> None:
          AND o.last_name = k.last_name
          AND o.phone_number = k.phone_number
         WHERE discs.owner_id = o.id
-          AND o.id <> k.id;
-
-        DELETE FROM owners
-        WHERE id NOT IN (SELECT id FROM owner_keepers);
-
-        DROP TABLE owner_keepers;
+          AND o.id <> k.id
         """
     )
+    op.execute(
+        "DELETE FROM owners WHERE id NOT IN (SELECT id FROM owner_keepers)"
+    )
+    op.execute("DROP TABLE owner_keepers")
 
     # 7. Re-add uniqueness on the new triple.
     op.create_unique_constraint(
