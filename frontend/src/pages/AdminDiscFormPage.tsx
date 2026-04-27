@@ -29,8 +29,10 @@ interface DiscFormState {
   name: string
   color: string
   input_date: string
-  owner_name: string
+  owner_first_name: string
+  owner_last_name: string
   phone_number: string
+  notes: string
   is_clear: boolean
   is_found: boolean
   is_returned: boolean
@@ -41,8 +43,10 @@ const defaultForm: DiscFormState = {
   name: '',
   color: '',
   input_date: new Date().toISOString().slice(0, 10),
-  owner_name: '',
+  owner_first_name: '',
+  owner_last_name: '',
   phone_number: '',
+  notes: '',
   is_clear: false,
   is_found: true,
   is_returned: false,
@@ -80,13 +84,20 @@ export function AdminDiscFormPage() {
   const { data: manufacturerSuggestions = [] } = useGetSuggestions({ field: 'manufacturer' })
   const { data: nameSuggestions = [] } = useGetSuggestions({ field: 'name' })
   const { data: colorSuggestions = [] } = useGetSuggestions({ field: 'color' })
-  const { data: ownerNameSuggestions = [] } = useGetSuggestions(
-    { field: 'owner_name' },
+  const { data: ownerFirstNameSuggestions = [] } = useGetSuggestions(
+    { field: 'owner_first_name' },
+    { query: { retry: false } },
+  )
+  const { data: ownerLastNameSuggestions = [] } = useGetSuggestions(
+    { field: 'owner_last_name' },
     { query: { retry: false } },
   )
   const { data: rawPhoneSuggestions = [] } = useGetPhoneSuggestions(
-    { owner_name: form.owner_name },
-    { query: { enabled: !!form.owner_name } },
+    {
+      owner_first_name: form.owner_first_name,
+      owner_last_name: form.owner_last_name,
+    },
+    { query: { enabled: !!form.owner_first_name || !!form.owner_last_name } },
   )
   const phoneSuggestions: Suggestion[] = rawPhoneSuggestions.map((s) => ({
     value: s.number,
@@ -100,8 +111,10 @@ export function AdminDiscFormPage() {
         name: existingDisc.name,
         color: existingDisc.color,
         input_date: existingDisc.input_date,
-        owner_name: existingDisc.owner?.name ?? '',
+        owner_first_name: existingDisc.owner?.first_name ?? '',
+        owner_last_name: existingDisc.owner?.last_name ?? '',
         phone_number: existingDisc.owner?.phone_number ?? '',
+        notes: existingDisc.notes ?? '',
         is_clear: existingDisc.is_clear,
         is_found: existingDisc.is_found,
         is_returned: existingDisc.is_returned,
@@ -123,8 +136,10 @@ export function AdminDiscFormPage() {
   const setValue = (field: keyof DiscFormState) => (value: string) =>
     setForm((f) => ({ ...f, [field]: value }))
 
-  const handleOwnerNameChange = (value: string) =>
-    setForm((f) => ({ ...f, owner_name: value, phone_number: '' }))
+  const handleOwnerFirstNameChange = (value: string) =>
+    setForm((f) => ({ ...f, owner_first_name: value, phone_number: '' }))
+  const handleOwnerLastNameChange = (value: string) =>
+    setForm((f) => ({ ...f, owner_last_name: value, phone_number: '' }))
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
@@ -143,10 +158,20 @@ export function AdminDiscFormPage() {
         return
       }
     }
+    const ownerSet =
+      !!form.owner_first_name || !!form.owner_last_name || !!normalizedPhone
     const payload = {
-      ...form,
-      owner_name: form.owner_name || null,
-      phone_number: normalizedPhone,
+      manufacturer: form.manufacturer,
+      name: form.name,
+      color: form.color,
+      input_date: form.input_date,
+      is_clear: form.is_clear,
+      is_found: form.is_found,
+      is_returned: form.is_returned,
+      notes: form.notes || null,
+      owner_first_name: ownerSet ? form.owner_first_name : null,
+      owner_last_name: ownerSet ? form.owner_last_name : null,
+      phone_number: ownerSet ? normalizedPhone : null,
     }
     try {
       if (isEdit) {
@@ -235,15 +260,27 @@ export function AdminDiscFormPage() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="disc-owner">Owner name</Label>
-              <AutocompleteInput
-                id="disc-owner"
-                value={form.owner_name}
-                suggestions={ownerNameSuggestions.map((v) => ({ value: v }))}
-                onValueChange={handleOwnerNameChange}
-                className={inputCls}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="disc-owner-first">First name</Label>
+                <AutocompleteInput
+                  id="disc-owner-first"
+                  value={form.owner_first_name}
+                  suggestions={ownerFirstNameSuggestions.map((v) => ({ value: v }))}
+                  onValueChange={handleOwnerFirstNameChange}
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="disc-owner-last">Last name</Label>
+                <AutocompleteInput
+                  id="disc-owner-last"
+                  value={form.owner_last_name}
+                  suggestions={ownerLastNameSuggestions.map((v) => ({ value: v }))}
+                  onValueChange={handleOwnerLastNameChange}
+                  className={inputCls}
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -275,6 +312,17 @@ export function AdminDiscFormPage() {
                   {field.replace('is_', '').replace('_', ' ')}
                 </label>
               ))}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="disc-notes">Notes</Label>
+              <textarea
+                id="disc-notes"
+                rows={3}
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                className={`${inputCls} h-auto py-2`}
+              />
             </div>
           </CardContent>
         </Card>
