@@ -68,7 +68,7 @@ class DiscRepository:
             stmt = stmt.where(Disc.is_returned == is_returned)
         if owner_name is not None:
             stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
-                Owner.name.ilike(f"%{owner_name}%")
+                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
             )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
@@ -109,7 +109,7 @@ class DiscRepository:
         stmt = select(func.count()).select_from(Disc)
         if owner_name is not None:
             stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
-                Owner.name.ilike(f"%{owner_name}%")
+                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
             )
         if is_found is not None:
             stmt = stmt.where(Disc.is_found == is_found)
