@@ -48,6 +48,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://northlanding:${POSTGRES_PASSWORD:-secret}@db:5432/northlanding
       SECRET_KEY: ${SECRET_KEY}
+      API_KEY_HMAC_SECRET: ${API_KEY_HMAC_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
