@@ -7,15 +7,11 @@ import {
   useCreateApiKeyUsersMeApiKeyPost,
   useDeleteApiKeyUsersMeApiKeyDelete,
   getGetApiKeyUsersMeApiKeyGetQueryKey,
+  type ApiKeyCreated,
 } from '../api/northlanding'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-
-// The backend returns untyped JSON; we cast to these shapes.
-type ApiKeyMeta = { last_four: string; created_at: string; last_used_at?: string | null }
-type NewKeyResult = { api_key: string; last_four: string; created_at: string }
-type NewKeyState = NewKeyResult | null
 
 function is404(err: unknown): boolean {
   return (err as { response?: { status?: number } })?.response?.status === 404
@@ -23,13 +19,12 @@ function is404(err: unknown): boolean {
 
 export function ApiKeyCard() {
   const queryClient = useQueryClient()
-  const [newKey, setNewKey] = useState<NewKeyState>(null)
+  const [newKey, setNewKey] = useState<ApiKeyCreated | null>(null)
   const [error, setError] = useState('')
 
-  const { data: rawMeta, error: getError } = useGetApiKeyUsersMeApiKeyGet({
+  const { data: keyMeta, error: getError } = useGetApiKeyUsersMeApiKeyGet({
     query: { retry: false },
   })
-  const keyMeta = rawMeta as ApiKeyMeta | undefined
 
   const createKey = useCreateApiKeyUsersMeApiKeyPost()
   const deleteKey = useDeleteApiKeyUsersMeApiKeyDelete()
@@ -44,7 +39,7 @@ export function ApiKeyCard() {
     setError('')
     try {
       const result = await createKey.mutateAsync()
-      setNewKey(result as NewKeyResult)
+      setNewKey(result)
       await invalidate()
     } catch {
       setError('Failed to generate API key.')
@@ -56,7 +51,7 @@ export function ApiKeyCard() {
     setError('')
     try {
       const result = await createKey.mutateAsync()
-      setNewKey(result as NewKeyResult)
+      setNewKey(result)
       await invalidate()
     } catch {
       setError('Failed to regenerate API key.')

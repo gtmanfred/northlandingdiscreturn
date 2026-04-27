@@ -29,6 +29,20 @@ export interface AddPhoneRequest {
   number: string;
 }
 
+export interface ApiKeyCreated {
+  api_key: string;
+  last_four: string;
+  created_at: string;
+}
+
+export type ApiKeyMetaLastUsedAt = string | null;
+
+export interface ApiKeyMeta {
+  last_four: string;
+  created_at: string;
+  last_used_at?: ApiKeyMetaLastUsedAt;
+}
+
 export interface BodyUploadDiscPhoto {
   file: Blob;
 }
@@ -1584,7 +1598,7 @@ export const getApiKeyUsersMeApiKeyGet = (
 ) => {
       
       
-      return customInstance<unknown>(
+      return customInstance<ApiKeyMeta>(
       {url: `/users/me/api-key`, method: 'GET', signal
     },
       );
@@ -1676,7 +1690,7 @@ export const createApiKeyUsersMeApiKeyPost = (
 ) => {
       
       
-      return customInstance<unknown>(
+      return customInstance<ApiKeyCreated>(
       {url: `/users/me/api-key`, method: 'POST', signal
     },
       );

@@ -808,7 +808,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyMeta"
+                }
               }
             }
           }
@@ -830,7 +832,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyCreated"
+                }
               }
             }
           }
@@ -1410,6 +1414,61 @@
           "number"
         ],
         "title": "AddPhoneRequest"
+      },
+      "ApiKeyCreated": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          },
+          "last_four": {
+            "type": "string",
+            "title": "Last Four"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key",
+          "last_four",
+          "created_at"
+        ],
+        "title": "ApiKeyCreated"
+      },
+      "ApiKeyMeta": {
+        "properties": {
+          "last_four": {
+            "type": "string",
+            "title": "Last Four"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "last_four",
+          "created_at"
+        ],
+        "title": "ApiKeyMeta"
       },
       "Body_uploadDiscPhoto": {
         "properties": {
