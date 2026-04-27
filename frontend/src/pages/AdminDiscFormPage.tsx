@@ -285,18 +285,30 @@ export function AdminDiscFormPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="disc-phone">Phone number</Label>
-              {phoneSuggestions.length > 0 ? (
-                <AutocompleteInput
-                  id="disc-phone"
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  value={form.phone_number}
-                  suggestions={phoneSuggestions}
-                  onValueChange={setValue('phone_number')}
-                  className={inputCls}
-                />
-              ) : (
-                <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
+              <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
+              {phoneSuggestions.length > 0 && (
+                <ul className="mt-2 space-y-1 rounded-md border border-input p-1">
+                  {phoneSuggestions.map((s) => {
+                    const selected =
+                      form.phone_number.replace(/\D/g, '') ===
+                      s.value.replace(/\D/g, '')
+                    return (
+                      <li key={s.value}>
+                        <button
+                          type="button"
+                          onClick={() => setValue('phone_number')(s.value)}
+                          className={`w-full rounded px-2 py-1 text-left text-sm transition-colors ${
+                            selected
+                              ? 'bg-primary text-primary-foreground'
+                              : 'hover:bg-accent'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </div>
 
