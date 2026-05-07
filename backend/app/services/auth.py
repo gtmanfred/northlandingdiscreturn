@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 from jose import jwt
-from twilio.rest import Client
+from app.services.surge import send_sms_sync
 from app.config import settings
 
 
@@ -24,9 +24,7 @@ def create_refresh_token() -> str:
 
 
 def send_verification_sms(to_number: str, code: str) -> None:
-    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-    client.messages.create(
-        body=f"Your North Landing disc return verification code is: {code}",
-        from_=settings.TWILIO_FROM_NUMBER,
-        to=to_number,
+    send_sms_sync(
+        to_number,
+        f"Your North Landing disc return verification code is: {code}",
     )
