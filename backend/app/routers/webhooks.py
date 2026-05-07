@@ -1,32 +1,58 @@
 # backend/app/routers/webhooks.py
 import hmac
 import hashlib
-import base64
-from fastapi import APIRouter, Request, HTTPException
+import json
+import time
+
+from fastapi import APIRouter, HTTPException, Request
+
 from app.config import settings
 
 router = APIRouter()
 
-
-def validate_twilio_signature(request_url: str, params: dict, signature: str) -> bool:
-    s = request_url
-    for key in sorted(params.keys()):
-        s += key + params[key]
-    mac = hmac.new(settings.TWILIO_AUTH_TOKEN.encode(), s.encode(), hashlib.sha1)
-    expected = base64.b64encode(mac.digest()).decode()
-    return hmac.compare_digest(expected, signature)
+SIGNATURE_TOLERANCE_SECONDS = 300
 
 
-@router.post("/twilio", operation_id="twilioWebhook", include_in_schema=False)
-async def twilio_inbound(request: Request):
-    form = await request.form()
-    params = dict(form)
-    signature = request.headers.get("X-Twilio-Signature", "")
-    url = str(request.url)
+def _parse_signature_header(header: str) -> tuple[str | None, list[str]]:
+    timestamp: str | None = None
+    v1s: list[str] = []
+    for part in header.split(","):
+        key, _, value = part.strip().partition("=")
+        if key == "t":
+            timestamp = value
+        elif key == "v1":
+            v1s.append(value)
+    return timestamp, v1s
 
-    if not validate_twilio_signature(url, params, signature):
-        raise HTTPException(status_code=403, detail="Invalid Twilio signature")
 
-    body = params.get("Body", "").strip().upper()
-    from_number = params.get("From", "")
+def validate_surge_signature(raw_body: bytes, header: str, secret: str) -> bool:
+    timestamp, v1s = _parse_signature_header(header)
+    if not timestamp or not v1s:
+        return False
+    try:
+        ts = int(timestamp)
+    except ValueError:
+        return False
+    if abs(time.time() - ts) > SIGNATURE_TOLERANCE_SECONDS:
+        return False
+    signed = f"{timestamp}.".encode() + raw_body
+    expected = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(expected, v) for v in v1s)
+
+
+@router.post("/sms", operation_id="surgeWebhook", include_in_schema=False)
+async def surge_inbound(request: Request):
+    raw = await request.body()
+    signature = request.headers.get("Surge-Signature", "")
+    if not validate_surge_signature(raw, signature, settings.SURGE_WEBHOOK_SIGNING_SECRET):
+        raise HTTPException(status_code=403, detail="Invalid Surge signature")
+
+    payload = json.loads(raw or b"{}")
+    if payload.get("type") != "message.received":
+        return {"status": "ignored"}
+
+    data = payload.get("data") or {}
+    body = (data.get("body") or "").strip().upper()
+    contact = (data.get("conversation") or {}).get("contact") or {}
+    from_number = contact.get("phone_number", "")
     return {"status": "received", "from": from_number, "body": body}
