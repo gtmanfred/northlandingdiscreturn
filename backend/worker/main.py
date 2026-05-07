@@ -1,12 +1,14 @@
 # backend/worker/main.py
 import asyncio
-import functools
 import logging
-from twilio.rest import Client
+
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from app.config import settings
 from app.repositories.pickup_event import PickupEventRepository
+from app.services.surge import send_sms_async
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,22 +27,15 @@ async def process_sms_jobs(db: AsyncSession | None = None) -> None:
         if not jobs:
             return
         logger.info(f"Processing {len(jobs)} SMS jobs")
-        twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        loop = asyncio.get_event_loop()
-        for job in jobs:
-            try:
-                send_fn = functools.partial(
-                    twilio_client.messages.create,
-                    body=job.message,
-                    from_=settings.TWILIO_FROM_NUMBER,
-                    to=job.phone_number,
-                )
-                await loop.run_in_executor(None, send_fn)
-                await repo.mark_sms_sent(job)
-                logger.info(f"SMS sent to {job.phone_number}")
-            except Exception as e:
-                await repo.mark_sms_failed(job, str(e))
-                logger.error(f"SMS failed to {job.phone_number}: {e}")
+        async with httpx.AsyncClient() as client:
+            for job in jobs:
+                try:
+                    await send_sms_async(client, job.phone_number, job.message)
+                    await repo.mark_sms_sent(job)
+                    logger.info(f"SMS sent to {job.phone_number}")
+                except Exception as e:
+                    await repo.mark_sms_failed(job, str(e))
+                    logger.error(f"SMS failed to {job.phone_number}: {e}")
         await db.commit()
     finally:
         if close_after:
