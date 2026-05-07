@@ -96,3 +96,17 @@ async def test_surge_webhook_supports_multiple_v1_values(client):
         headers={"Surge-Signature": header, "Content-Type": "application/json"},
     )
     assert resp.status_code == 200
+
+
+async def test_surge_webhook_rejects_when_signing_secret_unset(client, monkeypatch):
+    monkeypatch.setenv("SURGE_WEBHOOK_SIGNING_SECRET", "")
+    raw = _payload()
+    ts = int(time.time())
+    # Attacker computes HMAC with the (empty) secret they suspect is unset.
+    sig = make_surge_signature(raw, "", ts)
+    resp = await client.post(
+        "/webhooks/sms",
+        content=raw,
+        headers={"Surge-Signature": sig, "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 403

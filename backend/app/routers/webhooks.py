@@ -26,6 +26,8 @@ def _parse_signature_header(header: str) -> tuple[str | None, list[str]]:
 
 
 def validate_surge_signature(raw_body: bytes, header: str, secret: str) -> bool:
+    if not secret:
+        return False
     timestamp, v1s = _parse_signature_header(header)
     if not timestamp or not v1s:
         return False
@@ -48,7 +50,7 @@ async def surge_inbound(request: Request):
     if not validate_surge_signature(raw, signature, settings.SURGE_WEBHOOK_SIGNING_SECRET):
         raise HTTPException(status_code=403, detail="Invalid Surge signature")
 
-    payload = json.loads(raw or b"{}")
+    payload = json.loads(raw)
     if payload.get("type") != "message.received":
         return {"status": "ignored"}
 
