@@ -44,6 +44,7 @@ async def test_send_sms_async_posts_expected_payload():
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["url"] = str(request.url)
+        captured["auth"] = request.headers.get("Authorization")
         captured["json"] = httpx.Response(200, content=request.content).json()
         return httpx.Response(201, json={"id": "msg_test"})
 
@@ -52,6 +53,7 @@ async def test_send_sms_async_posts_expected_payload():
         await surge.send_sms_async(client, "+15559999999", "world")
 
     assert captured["url"] == _expected_url()
+    assert captured["auth"] == f"Bearer {settings.SURGE_API_KEY}"
     assert captured["json"]["to"] == "+15559999999"
     assert captured["json"]["body"] == "world"
 
