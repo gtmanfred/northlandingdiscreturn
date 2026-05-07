@@ -37,7 +37,8 @@ def validate_surge_signature(raw_body: bytes, header: str, secret: str) -> bool:
         return False
     signed = f"{timestamp}.".encode() + raw_body
     expected = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
-    return any(hmac.compare_digest(expected, v) for v in v1s)
+    matches = [hmac.compare_digest(expected, v) for v in v1s]
+    return any(matches)
 
 
 @router.post("/sms", operation_id="surgeWebhook", include_in_schema=False)
