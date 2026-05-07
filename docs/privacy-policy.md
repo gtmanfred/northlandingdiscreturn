@@ -34,7 +34,7 @@ We do not sell your personal information, and we do not use it for advertising.
 We share information only with the service providers needed to operate the program:
 
 - **Google** — for OAuth sign-in.
-- **Twilio** — to deliver SMS messages and receive your replies.
+- **Surge** — to deliver SMS messages and receive your replies.
 - **Fly.io** — for backend application hosting.
 - **Supabase** — for storage of disc photos.
 - **GitHub Pages** — for serving the website.

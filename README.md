@@ -13,7 +13,7 @@ A web application for managing lost disc golf discs at North Landing. Players lo
 | Database | PostgreSQL 16 |
 | Auth | Google OAuth2 + JWT session tokens |
 | Storage | Supabase Storage (self-hosted locally, cloud in production) |
-| SMS | Twilio (optional) |
+| SMS | Surge (optional) |
 | Frontend | React 18, TypeScript, Vite, TanStack Query, Tailwind CSS |
 | Backend hosting | Fly.io |
 | Frontend hosting | GitHub Pages |
@@ -86,9 +86,10 @@ FastAPI's interactive docs are available at http://localhost:8000/docs.
 | `GOOGLE_CLIENT_ID` | Yes | Google OAuth client ID. |
 | `GOOGLE_CLIENT_SECRET` | Yes | Google OAuth client secret. |
 | `ADMIN_EMAILS` | No | Comma-separated emails promoted to admin on startup. |
-| `TWILIO_ACCOUNT_SID` | No | Leave blank to disable SMS notifications. |
-| `TWILIO_AUTH_TOKEN` | No | Leave blank to disable SMS notifications. |
-| `TWILIO_FROM_NUMBER` | No | Leave blank to disable SMS notifications. |
+| `SURGE_API_KEY` | No | Surge API bearer token. Leave blank to disable SMS notifications. |
+| `SURGE_ACCOUNT_ID` | No | Surge account ID. Leave blank to disable SMS notifications. |
+| `SURGE_FROM_NUMBER` | No | Sender phone number in E.164. Leave blank to disable SMS notifications. |
+| `SURGE_WEBHOOK_SIGNING_SECRET` | No | Surge webhook HMAC-SHA256 signing secret. Leave blank to disable inbound webhook validation. |
 | `SUPABASE_JWT_SECRET` | No | Pre-baked local dev value in `.env.example`. |
 | `SUPABASE_ANON_KEY` | No | Pre-baked local dev JWT in `.env.example`. |
 | `SUPABASE_SERVICE_KEY` | No | Pre-baked local dev JWT in `.env.example`. |
