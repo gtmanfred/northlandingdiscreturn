@@ -71,6 +71,23 @@ services:
     ports:
       - "8000:8000"
 
+  worker:
+    build: ./backend
+    command: uv run python -m worker.main
+    environment:
+      DATABASE_URL: postgresql+asyncpg://northlanding:${POSTGRES_PASSWORD:-secret}@db:5432/northlanding
+      SURGE_API_KEY: ${SURGE_API_KEY:-}
+      SURGE_ACCOUNT_ID: ${SURGE_ACCOUNT_ID:-}
+      SURGE_FROM_NUMBER: ${SURGE_FROM_NUMBER:-}
+    volumes:
+      - ./backend:/srv
+      - backend_venv:/srv/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
   frontend:
     build: ./frontend
     command: sh -c "npm install && npm run dev"
