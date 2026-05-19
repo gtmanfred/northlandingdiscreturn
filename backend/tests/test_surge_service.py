@@ -63,3 +63,98 @@ async def test_send_sms_async_raises_on_non_2xx():
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(httpx.HTTPStatusError):
             await surge.send_sms_async(client, "+15550000000", "x")
+
+
+def _spy_sync_transport():
+    state = {"called": False}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["called"] = True
+        return httpx.Response(201, json={"id": "msg_test"})
+
+    return httpx.MockTransport(handler), state
+
+
+def test_send_sms_sync_blocked_when_test_mode_and_not_allowlisted(monkeypatch, caplog):
+    monkeypatch.setenv("SMS_TEST_MODE", "true")
+    monkeypatch.setenv("SMS_ALLOWLIST", "+15550000000")
+    transport, state = _spy_sync_transport()
+    monkeypatch.setattr(surge, "_make_sync_client", lambda: httpx.Client(transport=transport))
+
+    with caplog.at_level("INFO", logger="app.services.surge"):
+        surge.send_sms_sync("+15551234567", "hello")
+
+    assert state["called"] is False
+    assert any("sms blocked by test mode allowlist" in r.message for r in caplog.records)
+
+
+def test_send_sms_sync_sent_when_test_mode_and_allowlisted(monkeypatch):
+    monkeypatch.setenv("SMS_TEST_MODE", "true")
+    monkeypatch.setenv("SMS_ALLOWLIST", "+15551234567")
+    transport, state = _spy_sync_transport()
+    monkeypatch.setattr(surge, "_make_sync_client", lambda: httpx.Client(transport=transport))
+
+    surge.send_sms_sync("+15551234567", "hello")
+
+    assert state["called"] is True
+
+
+def test_send_sms_sync_sent_when_test_mode_off(monkeypatch):
+    monkeypatch.delenv("SMS_TEST_MODE", raising=False)
+    monkeypatch.delenv("SMS_ALLOWLIST", raising=False)
+    transport, state = _spy_sync_transport()
+    monkeypatch.setattr(surge, "_make_sync_client", lambda: httpx.Client(transport=transport))
+
+    surge.send_sms_sync("+15551234567", "hello")
+
+    assert state["called"] is True
+
+
+async def test_send_sms_async_blocked_when_test_mode_and_not_allowlisted(monkeypatch, caplog):
+    monkeypatch.setenv("SMS_TEST_MODE", "true")
+    monkeypatch.setenv("SMS_ALLOWLIST", "+15550000000")
+    state = {"called": False}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["called"] = True
+        return httpx.Response(201, json={"id": "msg_test"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        with caplog.at_level("INFO", logger="app.services.surge"):
+            await surge.send_sms_async(client, "+15551234567", "hello")
+
+    assert state["called"] is False
+    assert any("sms blocked by test mode allowlist" in r.message for r in caplog.records)
+
+
+async def test_send_sms_async_sent_when_test_mode_and_allowlisted(monkeypatch):
+    monkeypatch.setenv("SMS_TEST_MODE", "true")
+    monkeypatch.setenv("SMS_ALLOWLIST", "+15551234567")
+    state = {"called": False}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["called"] = True
+        return httpx.Response(201, json={"id": "msg_test"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        await surge.send_sms_async(client, "+15551234567", "hello")
+
+    assert state["called"] is True
+
+
+async def test_send_sms_async_sent_when_test_mode_off(monkeypatch):
+    monkeypatch.delenv("SMS_TEST_MODE", raising=False)
+    monkeypatch.delenv("SMS_ALLOWLIST", raising=False)
+    state = {"called": False}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["called"] = True
+        return httpx.Response(201, json={"id": "msg_test"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        await surge.send_sms_async(client, "+15551234567", "hello")
+
+    assert state["called"] is True
