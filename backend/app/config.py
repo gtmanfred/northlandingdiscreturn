@@ -26,6 +26,8 @@ class Config(metaclass=figenv.MetaConfig):
     API_KEY_HMAC_SECRET = ""
     FRONTEND_URL = "http://localhost:5173"
     ADMIN_EMAILS: csv = ""  # coerced to [] when unset
+    SMS_TEST_MODE = False
+    SMS_ALLOWLIST: csv = ""  # CSV of E.164 numbers, coerced to [] when unset
 
 
 settings = Config
