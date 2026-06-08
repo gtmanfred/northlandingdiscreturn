@@ -175,6 +175,7 @@ from app.models.pickup_event import SMSJob
 
 
 async def test_heads_up_enqueued_on_first_found_disc(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
 
@@ -183,7 +184,8 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
     )
     await db.commit()
 
-    sent = await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", color="red")
+    sent = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent is True
     await db.refresh(owner)
@@ -195,15 +197,17 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
 
 
 async def test_heads_up_not_re_enqueued(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
     owner = await OwnerRepository(db).resolve_or_create(
         first_name="Jay", last_name="", phone_number="+15558000002"
     )
     await db.commit()
-    await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", color="red")
+    await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
-    sent_again = await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    sent_again = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent_again is False
     jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
@@ -211,13 +215,15 @@ async def test_heads_up_not_re_enqueued(db):
 
 
 async def test_heads_up_not_enqueued_for_wishlist(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
     owner = await OwnerRepository(db).resolve_or_create(
         first_name="Kay", last_name="", phone_number="+15558000003"
     )
     await db.commit()
-    sent = await maybe_enqueue_heads_up(owner=owner, is_found=False, db=db)
+    disc = types.SimpleNamespace(is_found=False, manufacturer="Innova", name="Destroyer", color="red")
+    sent = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent is False
     await db.refresh(owner)
