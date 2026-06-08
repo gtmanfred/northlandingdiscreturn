@@ -65,6 +65,17 @@ async def test_disc_owner_id_nullable(db):
 from app.repositories.owner import OwnerRepository
 
 
+async def test_repo_mark_welcome_sent(db):
+    repo = OwnerRepository(db)
+    owner = await repo.resolve_or_create(first_name="W", last_name="", phone_number="+15554440000")
+    await db.commit()
+    assert owner.welcome_sent_at is None
+    await repo.mark_welcome_sent(owner)
+    await db.commit()
+    await db.refresh(owner)
+    assert owner.welcome_sent_at is not None
+
+
 async def test_repo_resolve_creates_new_owner(db):
     repo = OwnerRepository(db)
     owner = await repo.resolve_or_create(first_name="Jill", last_name="", phone_number="+15551111111")
