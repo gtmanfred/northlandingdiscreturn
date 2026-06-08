@@ -327,8 +327,11 @@ async def test_admin_create_disc_enqueues_heads_up(db, client):
     assert body["owner"]["phone_number"] == "+15551234567"
 
     jobs = (await db.execute(select(SMSJob))).scalars().all()
-    assert len(jobs) == 1
-    assert "New Owner" in jobs[0].message
+    # welcome + heads-up
+    assert len(jobs) == 2
+    assert all("New Owner" in j.message for j in jobs)
+    assert any("We found one of your discs" in j.message for j in jobs)
+    assert any("discreturn.nl" in j.message for j in jobs)
 
     owner = (await db.execute(select(Owner))).scalar_one()
     assert owner.heads_up_sent_at is not None
@@ -356,7 +359,8 @@ async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
         assert resp.status_code == 201
 
     jobs = (await db.execute(select(SMSJob))).scalars().all()
-    assert len(jobs) == 1
+    # first create => welcome + heads-up; second create => both gated, none added
+    assert len(jobs) == 2
 
 
 async def test_welcome_sms_sent_for_wishlist_owner(db, client):
