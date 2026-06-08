@@ -194,6 +194,7 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
     jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
     assert len(jobs) == 1
     assert "North Landing Disc Return" in jobs[0].message
+    assert "Innova Destroyer (red)" in jobs[0].message
 
 
 async def test_heads_up_not_re_enqueued(db):

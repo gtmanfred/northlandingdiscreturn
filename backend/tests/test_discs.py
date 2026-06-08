@@ -335,6 +335,7 @@ async def test_admin_create_disc_enqueues_heads_up(db, client):
 
     owner = (await db.execute(select(Owner))).scalar_one()
     assert owner.heads_up_sent_at is not None
+    assert owner.welcome_sent_at is not None
 
 
 async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
@@ -391,6 +392,8 @@ async def test_welcome_sms_sent_for_wishlist_owner(db, client):
 
     owner = (await db.execute(select(Owner))).scalar_one()
     assert owner.welcome_sent_at is not None
+    # wishlist disc must not trigger a heads-up
+    assert owner.heads_up_sent_at is None
 
 
 async def test_heads_up_includes_disc_details(db, client):
