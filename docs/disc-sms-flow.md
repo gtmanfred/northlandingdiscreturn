@@ -117,7 +117,8 @@ Source: `backend/app/services/welcome.py`
 
 > Hi {name}, this is North Landing Disc Return — we reunite lost discs with their
 > owners. To see what discs have been found and get pickup updates, go to discreturn.nl,
-> sign up, and connect this phone number to your profile. Reply STOP to opt out.
+> sign up, and connect this phone number to your profile. This number isn't monitored
+> for replies. Reply STOP to opt out.
 
 - `{name}` = owner full name, e.g. `Jane Smith`.
 - Fires for **any** new owner, including wishlist (`is_found=false`) discs.
@@ -127,7 +128,7 @@ Source: `backend/app/services/welcome.py`
 Source: `backend/app/services/heads_up.py`
 
 > Hi {name}, this is North Landing Disc Return. We found one of your discs: {disc_desc}.
-> Reply STOP to opt out.
+> Questions or comments? Email nldiscman@gmail.com. Reply STOP to opt out.
 
 - `{name}` = owner full name, e.g. `Jane Smith`.
 - `{disc_desc}` = `Manufacturer Name (Color)`, e.g. `Innova Destroyer (red)`.
@@ -136,15 +137,16 @@ Source: `backend/app/services/heads_up.py`
 
 Source: `backend/app/services/notification.py`
 
-> Disc pickup at North Landing {window_str}. You have disc(s): {disc_list}. Reply STOP
-> to opt out.
+> Disc pickup at North Landing {window_str}. You have disc(s): {disc_list}. Questions or
+> comments? Email nldiscman@gmail.com. Reply STOP to opt out.
 
 ### Template 3 — Final notice pickup notification
 
 Source: `backend/app/services/notification.py`
 
 > FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the sale box if not picked
-> up at the {window_str} pickup. Reply STOP to opt out.
+> up at the {window_str} pickup. Questions or comments? Email nldiscman@gmail.com. Reply
+> STOP to opt out.
 
 ### Shared placeholders for Templates 2 & 3
 
