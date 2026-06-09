@@ -56,12 +56,15 @@ async def enqueue_pickup_notifications(
             message = (
                 f"FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the "
                 f"sale box if not picked up at the {window_str} pickup. "
+                "Questions or comments? Email nldiscman@gmail.com. "
                 "Reply STOP to opt out."
             )
         else:
             message = (
                 f"Disc pickup at North Landing {window_str}. "
-                f"You have disc(s): {disc_list}. Reply STOP to opt out."
+                f"You have disc(s): {disc_list}. "
+                "Questions or comments? Email nldiscman@gmail.com. "
+                "Reply STOP to opt out."
             )
         await event_repo.create_sms_job(phone_number=phone, message=message)
         sms_count += 1

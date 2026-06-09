@@ -327,11 +327,15 @@ async def test_admin_create_disc_enqueues_heads_up(db, client):
     assert body["owner"]["phone_number"] == "+15551234567"
 
     jobs = (await db.execute(select(SMSJob))).scalars().all()
-    assert len(jobs) == 1
-    assert "New Owner" in jobs[0].message
+    # welcome + heads-up
+    assert len(jobs) == 2
+    assert all("New Owner" in j.message for j in jobs)
+    assert any("We found one of your discs" in j.message for j in jobs)
+    assert any("discreturn.nl" in j.message for j in jobs)
 
     owner = (await db.execute(select(Owner))).scalar_one()
     assert owner.heads_up_sent_at is not None
+    assert owner.welcome_sent_at is not None
 
 
 async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
@@ -356,7 +360,68 @@ async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
         assert resp.status_code == 201
 
     jobs = (await db.execute(select(SMSJob))).scalars().all()
+    # first create => welcome + heads-up; second create => both gated, none added
+    assert len(jobs) == 2
+
+
+async def test_welcome_sms_sent_for_wishlist_owner(db, client):
+    from sqlalchemy import select
+    from app.models.pickup_event import SMSJob
+    from app.models.owner import Owner
+
+    admin = await make_admin(db)
+    resp = await client.post(
+        "/discs",
+        headers=admin_headers(admin.id),
+        json={
+            "manufacturer": "Innova",
+            "name": "Destroyer",
+            "color": "red",
+            "input_date": "2026-04-01",
+            "owner_first_name": "Wish",
+            "owner_last_name": "List",
+            "phone_number": "5552220000",
+            "is_found": False,
+        },
+    )
+    assert resp.status_code == 201
+
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 1
+    assert "discreturn.nl" in jobs[0].message
+
+    owner = (await db.execute(select(Owner))).scalar_one()
+    assert owner.welcome_sent_at is not None
+    # wishlist disc must not trigger a heads-up
+    assert owner.heads_up_sent_at is None
+
+
+async def test_heads_up_includes_disc_details(db, client):
+    from sqlalchemy import select
+    from app.models.pickup_event import SMSJob
+
+    admin = await make_admin(db)
+    resp = await client.post(
+        "/discs",
+        headers=admin_headers(admin.id),
+        json={
+            "manufacturer": "Innova",
+            "name": "Destroyer",
+            "color": "red",
+            "input_date": "2026-04-01",
+            "owner_first_name": "Found",
+            "owner_last_name": "Owner",
+            "phone_number": "5553330000",
+        },
+    )
+    assert resp.status_code == 201
+
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 2
+    heads_up = [j for j in jobs if "We found one of your discs" in j.message]
+    assert len(heads_up) == 1
+    assert "Innova Destroyer (red)" in heads_up[0].message
+    assert "discreturn.nl" not in heads_up[0].message
 
 
 async def test_admin_list_discs_owner_full_name_filter(client, db):

@@ -19,10 +19,14 @@ for SMS.
 
 ## SMS send points
 
-There are exactly **two** places an SMS is enqueued:
+There are exactly **three** places an SMS is enqueued:
 
-1. **Heads-up** — fired once per owner when a found disc with owner info is created.
-2. **Pickup notification** — fired manually by an admin per pickup event; regular or
+1. **Welcome** — fired once per owner the first time their phone number is entered
+   (any disc, found or wishlist). Explains the app + how to connect their number at
+   discreturn.nl.
+2. **Heads-up** — fired once per owner when a *found* disc with owner info is created;
+   names the found disc.
+3. **Pickup notification** — fired manually by an admin per pickup event; regular or
    final-notice variant.
 
 Both write an `SMSJob` row. A background worker polls every 10s, claims pending jobs,
@@ -40,10 +44,15 @@ flowchart TD
     B -- no --> D[disc has no owner]
     C --> E[DiscRepository.create]
     D --> E
-    E --> F{maybe_enqueue_heads_up<br/>is_found AND<br/>owner.heads_up_sent_at is NULL?}
-    F -- yes --> G[[SMSJob: Template 1<br/>HEADS-UP]]
+    E --> WEL{maybe_enqueue_welcome<br/>owner.welcome_sent_at is NULL?}
+    WEL -- yes --> WG[[SMSJob: Template 0<br/>WELCOME]]
+    WG --> WH[stamp owner.welcome_sent_at]
+    WH --> F
+    WEL -- no --> F
+    F{maybe_enqueue_heads_up<br/>is_found AND<br/>owner.heads_up_sent_at is NULL?}
+    F -- yes --> G[[SMSJob: Template 1<br/>HEADS-UP + disc details]]
     G --> H[stamp owner.heads_up_sent_at]
-    F -- no --> I[no SMS]
+    F -- no --> I[no heads-up]
 
     %% ----- Disc mutation -----
     M[Admin: PATCH /discs/id] --> N[DiscRepository.update]
@@ -72,7 +81,8 @@ flowchart TD
 
     %% ----- Worker delivery -----
     subgraph WK[Worker — every 10s]
-        G -.enqueued.-> WJ[claim pending SMSJob<br/>FOR UPDATE SKIP LOCKED]
+        WG -.enqueued.-> WJ[claim pending SMSJob<br/>FOR UPDATE SKIP LOCKED]
+        G -.enqueued.-> WJ
         AE -.enqueued.-> WJ
         AF -.enqueued.-> WJ
         WJ --> WS{SMS_TEST_MODE<br/>AND not in allowlist?}
@@ -83,6 +93,9 @@ flowchart TD
 
 ## Key rules
 
+- **Welcome is once per owner, ever** — gated on `owner.welcome_sent_at`, independent of
+  `is_found`. Enqueued before heads-up, so a new found-disc owner gets welcome first,
+  then heads-up (two texts).
 - **Heads-up is once per owner, ever** — gated on `owner.heads_up_sent_at`, not per
   disc. Adding a second disc for the same owner sends no new heads-up.
 - **Returning a disc sends nothing** — `is_returned=true` via PATCH is a silent admin
@@ -98,29 +111,42 @@ flowchart TD
 
 Variables shown as `{placeholder}`.
 
+### Template 0 — Welcome
+
+Source: `backend/app/services/welcome.py`
+
+> Hi {name}, this is North Landing Disc Return — we reunite lost discs with their
+> owners. To see what discs have been found and get pickup updates, go to discreturn.nl,
+> sign up, and connect this phone number to your profile. This number isn't monitored
+> for replies. Reply STOP to opt out.
+
+- `{name}` = owner full name, e.g. `Jane Smith`.
+- Fires for **any** new owner, including wishlist (`is_found=false`) discs.
+
 ### Template 1 — Heads-up
 
 Source: `backend/app/services/heads_up.py`
 
-> Hi {name}, this is North Landing Disc Return. We found one of your discs. We'll text
-> you again when we schedule a pickup event — these happen every 1-2 months. Reply STOP
-> to opt out.
+> Hi {name}, this is North Landing Disc Return. We found one of your discs: {disc_desc}.
+> Questions or comments? Email nldiscman@gmail.com. Reply STOP to opt out.
 
 - `{name}` = owner full name, e.g. `Jane Smith`.
+- `{disc_desc}` = `Manufacturer Name (Color)`, e.g. `Innova Destroyer (red)`.
 
 ### Template 2 — Regular pickup notification
 
 Source: `backend/app/services/notification.py`
 
-> Disc pickup at North Landing {window_str}. You have disc(s): {disc_list}. Reply STOP
-> to opt out.
+> Disc pickup at North Landing {window_str}. You have disc(s): {disc_list}. Questions or
+> comments? Email nldiscman@gmail.com. Reply STOP to opt out.
 
 ### Template 3 — Final notice pickup notification
 
 Source: `backend/app/services/notification.py`
 
 > FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the sale box if not picked
-> up at the {window_str} pickup. Reply STOP to opt out.
+> up at the {window_str} pickup. Questions or comments? Email nldiscman@gmail.com. Reply
+> STOP to opt out.
 
 ### Shared placeholders for Templates 2 & 3
 
