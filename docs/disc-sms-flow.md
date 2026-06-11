@@ -116,7 +116,7 @@ Variables shown as `{placeholder}`.
 Source: `backend/app/services/welcome.py`
 
 > Hi {name}, this is North Landing Disc Return — we reunite lost discs with their
-> owners. To see what discs have been found and get pickup updates, go to discreturn.nl,
+> owners. To see what discs have been found and get pickup updates, go to https://discreturn.nl,
 > sign up, and connect this phone number to your profile. This number isn't monitored
 > for replies. Reply STOP to opt out.
 
@@ -128,7 +128,8 @@ Source: `backend/app/services/welcome.py`
 Source: `backend/app/services/heads_up.py`
 
 > Hi {name}, this is North Landing Disc Return. We found one of your discs: {disc_desc}.
-> Questions or comments? Email nldiscman@gmail.com. Reply STOP to opt out.
+> View it and get pickup details at https://discreturn.nl. Questions or comments? Email
+> nldiscman@gmail.com. Reply STOP to opt out.
 
 - `{name}` = owner full name, e.g. `Jane Smith`.
 - `{disc_desc}` = `Manufacturer Name (Color)`, e.g. `Innova Destroyer (red)`.
@@ -137,16 +138,17 @@ Source: `backend/app/services/heads_up.py`
 
 Source: `backend/app/services/notification.py`
 
-> Disc pickup at North Landing {window_str}. You have disc(s): {disc_list}. Questions or
-> comments? Email nldiscman@gmail.com. Reply STOP to opt out.
+> Disc pickup at North Landing {window_str}. You have disc(s): {disc_list}. Register at
+> https://discreturn.nl to view the discs you have to pick up. Questions or comments? Email
+> nldiscman@gmail.com. Reply STOP to opt out.
 
 ### Template 3 — Final notice pickup notification
 
 Source: `backend/app/services/notification.py`
 
 > FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the sale box if not picked
-> up at the {window_str} pickup. Questions or comments? Email nldiscman@gmail.com. Reply
-> STOP to opt out.
+> up at the {window_str} pickup. Register at https://discreturn.nl to view the discs you have to
+> pick up. Questions or comments? Email nldiscman@gmail.com. Reply STOP to opt out.
 
 ### Shared placeholders for Templates 2 & 3
 
