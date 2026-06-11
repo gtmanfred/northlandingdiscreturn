@@ -18,6 +18,8 @@ beforeEach(() => {
   addMutate.mockReset().mockResolvedValue({})
   vi.mocked(useVerifyPhone).mockReturnValue({ mutateAsync: verifyMutate, isPending: false } as any)
   vi.mocked(useAddPhone).mockReturnValue({ mutateAsync: addMutate, isPending: false } as any)
+  baseProps.onRemove.mockReset()
+  baseProps.onVerified.mockReset()
 })
 
 const baseProps = {
@@ -75,5 +77,21 @@ describe('PhoneNumberRow', () => {
     await user.click(screen.getByRole('button', { name: /resend code/i }))
     expect(addMutate).toHaveBeenCalledWith({ data: { number: '+15551234567' } })
     expect(await screen.findByText(/new code sent/i)).toBeInTheDocument()
+  })
+
+  it('Remove button calls onRemove with the phone number', async () => {
+    const user = userEvent.setup()
+    const onRemove = vi.fn()
+    render(<PhoneNumberRow {...baseProps} verified onRemove={onRemove} />)
+    await user.click(screen.getByRole('button', { name: /remove/i }))
+    expect(onRemove).toHaveBeenCalledWith('+15551234567')
+  })
+
+  it('shows an error when resend fails', async () => {
+    const user = userEvent.setup()
+    addMutate.mockRejectedValue(new Error('network'))
+    render(<PhoneNumberRow {...baseProps} verified={false} />)
+    await user.click(screen.getByRole('button', { name: /resend code/i }))
+    expect(await screen.findByText(/failed to send code/i)).toBeInTheDocument()
   })
 })

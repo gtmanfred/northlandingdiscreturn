@@ -87,7 +87,7 @@ export function PhoneNumberRow({ number, verified, onRemove, onVerified }: Phone
                 <AlertDescription>{message.text}</AlertDescription>
               </Alert>
             ) : (
-              <p className="text-xs text-green-700">{message.text}</p>
+              <p role="status" className="text-xs text-green-700">{message.text}</p>
             ))}
         </form>
       )}
