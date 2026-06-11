@@ -334,11 +334,10 @@ async def test_admin_create_disc_enqueues_heads_up(db, client):
     assert any("discreturn.nl" in j.message for j in jobs)
 
     owner = (await db.execute(select(Owner))).scalar_one()
-    assert owner.heads_up_sent_at is not None
     assert owner.welcome_sent_at is not None
 
 
-async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
+async def test_admin_create_second_disc_same_owner_sends_heads_up_each(db, client):
     from sqlalchemy import select
     from app.models.pickup_event import SMSJob
 
@@ -360,8 +359,11 @@ async def test_admin_create_second_disc_same_owner_skips_heads_up(db, client):
         assert resp.status_code == 201
 
     jobs = (await db.execute(select(SMSJob))).scalars().all()
-    # first create => welcome + heads-up; second create => both gated, none added
-    assert len(jobs) == 2
+    # welcome is one-time; heads-up fires per found disc
+    welcome = [j for j in jobs if "reunite lost discs" in j.message]
+    heads_up = [j for j in jobs if "We found one of your discs" in j.message]
+    assert len(welcome) == 1
+    assert len(heads_up) == 2
 
 
 async def test_welcome_sms_sent_for_wishlist_owner(db, client):
