@@ -56,6 +56,7 @@ async def enqueue_pickup_notifications(
             message = (
                 f"FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the "
                 f"sale box if not picked up at the {window_str} pickup. "
+                "Register at https://discreturn.nl to view the discs you have to pick up. "
                 "Questions or comments? Email nldiscman@gmail.com. "
                 "Reply STOP to opt out."
             )
@@ -63,6 +64,7 @@ async def enqueue_pickup_notifications(
             message = (
                 f"Disc pickup at North Landing {window_str}. "
                 f"You have disc(s): {disc_list}. "
+                "Register at https://discreturn.nl to view the discs you have to pick up. "
                 "Questions or comments? Email nldiscman@gmail.com. "
                 "Reply STOP to opt out."
             )

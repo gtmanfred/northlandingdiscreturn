@@ -7,7 +7,8 @@ from app.repositories.pickup_event import PickupEventRepository
 
 HEADS_UP_TEMPLATE = (
     "Hi {name}, this is North Landing Disc Return. We found one of your discs: "
-    "{disc_desc}. Questions or comments? Email nldiscman@gmail.com. "
+    "{disc_desc}. View it and get pickup details at https://discreturn.nl. "
+    "Questions or comments? Email nldiscman@gmail.com. "
     "Reply STOP to opt out."
 )
 

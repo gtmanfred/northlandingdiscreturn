@@ -421,7 +421,7 @@ async def test_heads_up_includes_disc_details(db, client):
     heads_up = [j for j in jobs if "We found one of your discs" in j.message]
     assert len(heads_up) == 1
     assert "Innova Destroyer (red)" in heads_up[0].message
-    assert "discreturn.nl" not in heads_up[0].message
+    assert "https://discreturn.nl" in heads_up[0].message
 
 
 async def test_admin_list_discs_owner_full_name_filter(client, db):

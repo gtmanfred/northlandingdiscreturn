@@ -270,3 +270,5 @@ async def test_notification_groups_by_owner(db):
     # created via the repo, not the admin create flow).
     phones = sorted(j.phone_number for j in jobs)
     assert phones == ["+15559000001", "+15559000002"]
+    # Every pickup notification points owners to discreturn.nl to view their discs.
+    assert all("discreturn.nl" in j.message for j in jobs)

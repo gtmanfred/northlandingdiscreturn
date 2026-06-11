@@ -7,7 +7,7 @@ from app.repositories.pickup_event import PickupEventRepository
 WELCOME_TEMPLATE = (
     "Hi {name}, this is North Landing Disc Return — we reunite lost discs with "
     "their owners. To see what discs have been found and get pickup updates, go "
-    "to discreturn.nl, sign up, and connect this phone number to your profile. "
+    "to https://discreturn.nl, sign up, and connect this phone number to your profile. "
     "This number isn't monitored for replies. Reply STOP to opt out."
 )
 
