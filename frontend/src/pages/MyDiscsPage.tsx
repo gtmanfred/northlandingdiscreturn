@@ -1,26 +1,44 @@
-import { useGetMyDiscs } from '../api/northlanding'
+import { Link } from 'react-router-dom'
+import { useGetMyDiscs, useGetMe } from '../api/northlanding'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { StatusBadge, discStatus } from '../components/StatusBadge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Disc3 } from 'lucide-react'
+import { Disc3, Phone } from 'lucide-react'
 
 export function MyDiscsPage() {
   const { data: discs, isLoading } = useGetMyDiscs()
+  const { data: user, isLoading: userLoading } = useGetMe()
+
+  const hasVerifiedPhone = user?.phone_numbers?.some((p) => p.verified) ?? false
 
   return (
     <div>
       <PageHeader title="My Discs" description="Discs matching your linked phone numbers." />
 
-      {isLoading ? (
+      {isLoading || userLoading ? (
         <LoadingState variant="list" rows={3} />
       ) : !discs?.length ? (
-        <EmptyState
-          icon={<Disc3 className="h-10 w-10" aria-hidden="true" />}
-          title="No discs found"
-          description="Nothing is linked to your verified phone numbers yet."
-        />
+        !hasVerifiedPhone ? (
+          <EmptyState
+            icon={<Phone className="h-10 w-10" aria-hidden="true" />}
+            title="Add a phone number"
+            description="Discs are matched to your verified phone number. Register one on your profile to see your discs here."
+            action={
+              <Button asChild>
+                <Link to="/my/profile">Go to profile</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<Disc3 className="h-10 w-10" aria-hidden="true" />}
+            title="No discs found"
+            description="Nothing is linked to your verified phone numbers yet."
+          />
+        )
       ) : (
         <div className="space-y-3">
           {discs.map((disc) => (
