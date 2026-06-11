@@ -48,8 +48,13 @@ export function MyProfilePage() {
   }
 
   const handleRemove = async (number: string) => {
-    await removePhone.mutateAsync({ number })
-    refresh()
+    setError('')
+    try {
+      await removePhone.mutateAsync({ number })
+      refresh()
+    } catch {
+      setError('Failed to remove phone number.')
+    }
   }
 
   if (isLoading) return <LoadingState />
