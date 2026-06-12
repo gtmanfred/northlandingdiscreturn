@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { MyDiscsPage } from './MyDiscsPage'
@@ -20,6 +21,12 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('MyDiscsPage', () => {
+  beforeAll(() => {
+    // jsdom lacks these; Radix Select needs them to open and select options.
+    Element.prototype.hasPointerCapture = vi.fn()
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+
   beforeEach(() => {
     // Default: a verified phone number, so the register prompt stays hidden.
     vi.mocked(useGetMe).mockReturnValue({
@@ -79,5 +86,52 @@ describe('MyDiscsPage', () => {
     vi.mocked(useGetMe).mockReturnValue({ isLoading: true, data: undefined } as any)
     render(<MyDiscsPage />, { wrapper })
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
+  })
+
+  const twoDiscs = [
+    { id: '1', manufacturer: 'Innova', name: 'Destroyer', color: 'Red', is_returned: false, photos: [] },
+    { id: '2', manufacturer: 'Discraft', name: 'Buzzz', color: 'Blue', is_returned: true, photos: [] },
+  ]
+
+  it('defaults to showing only discs awaiting pickup', () => {
+    vi.mocked(useGetMyDiscs).mockReturnValue({ isLoading: false, data: twoDiscs } as any)
+    render(<MyDiscsPage />, { wrapper })
+    expect(screen.getByText('Destroyer')).toBeInTheDocument()
+    expect(screen.queryByText('Buzzz')).not.toBeInTheDocument()
+  })
+
+  it('shows only returned discs when the Returned filter is selected', async () => {
+    vi.mocked(useGetMyDiscs).mockReturnValue({ isLoading: false, data: twoDiscs } as any)
+    render(<MyDiscsPage />, { wrapper })
+    await userEvent.click(screen.getByRole('combobox', { name: /show/i }))
+    await userEvent.click(screen.getByRole('option', { name: 'Returned' }))
+    expect(screen.getByText('Buzzz')).toBeInTheDocument()
+    expect(screen.queryByText('Destroyer')).not.toBeInTheDocument()
+  })
+
+  it('shows all discs when the All filter is selected', async () => {
+    vi.mocked(useGetMyDiscs).mockReturnValue({ isLoading: false, data: twoDiscs } as any)
+    render(<MyDiscsPage />, { wrapper })
+    await userEvent.click(screen.getByRole('combobox', { name: /show/i }))
+    await userEvent.click(screen.getByRole('option', { name: 'All' }))
+    expect(screen.getByText('Buzzz')).toBeInTheDocument()
+    expect(screen.getByText('Destroyer')).toBeInTheDocument()
+  })
+
+  it('shows a no-match message when the filter hides every disc', async () => {
+    const onlyReturned = [
+      { id: '2', manufacturer: 'Discraft', name: 'Buzzz', color: 'Blue', is_returned: true, photos: [] },
+    ]
+    vi.mocked(useGetMyDiscs).mockReturnValue({ isLoading: false, data: onlyReturned } as any)
+    render(<MyDiscsPage />, { wrapper })
+    // Default 'awaiting' filter hides the only (returned) disc.
+    expect(screen.getByText(/no discs match this filter/i)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /show/i })).toBeInTheDocument()
+  })
+
+  it('does not render the filter when there are zero discs', () => {
+    vi.mocked(useGetMyDiscs).mockReturnValue({ isLoading: false, data: [] } as any)
+    render(<MyDiscsPage />, { wrapper })
+    expect(screen.queryByRole('combobox', { name: /show/i })).not.toBeInTheDocument()
   })
 })
