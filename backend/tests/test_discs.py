@@ -462,6 +462,23 @@ async def test_heads_up_includes_disc_details(db, client):
     assert "https://discreturn.nl" in heads_up[0].message
 
 
+async def test_owner_allows_null_phone(db):
+    from app.models.owner import Owner
+    owner = Owner(first_name="No", last_name="Phone", phone_number=None)
+    db.add(owner)
+    await db.flush()
+    await db.refresh(owner)
+    assert owner.phone_number is None
+
+
+async def test_disc_has_returned_date_default_none(db):
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Roc", colors=["Red"], input_date=date.today()
+    )
+    assert disc.returned_date is None
+
+
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository

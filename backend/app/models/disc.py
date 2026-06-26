@@ -21,6 +21,7 @@ class Disc(Base):
     )
     is_clear: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     input_date: Mapped[date] = mapped_column(Date, nullable=False)
+    returned_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_found: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_returned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     final_notice_sent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
