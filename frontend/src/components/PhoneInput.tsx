@@ -17,7 +17,7 @@ export function PhoneInput({ value, onChange, className = '' }: PhoneInputProps)
   // Sync internal segments when `value` is set externally (e.g. picking a
   // phone suggestion or hydrating from an existing record).
   useEffect(() => {
-    const digits = value.replace(/\D/g, '')
+    const digits = toNational(value)
     if (`${area}${exchange}${line}` === digits) return
     setArea(digits.slice(0, 3))
     setExchange(digits.slice(3, 6))
@@ -25,9 +25,15 @@ export function PhoneInput({ value, onChange, className = '' }: PhoneInputProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
-  function extractPart(digits: string, start: number, end: number) {
-    const d = digits.replace(/\D/g, '')
-    return d.slice(start, end)
+  // Reduce a value to its 10 national digits, dropping the US "+1" country
+  // code so it doesn't leak into the area code (e.g. "+15551234567" -> "5551234567").
+  function toNational(value: string) {
+    const d = value.replace(/\D/g, '')
+    return d.length === 11 && d[0] === '1' ? d.slice(1) : d
+  }
+
+  function extractPart(value: string, start: number, end: number) {
+    return toNational(value).slice(start, end)
   }
 
   function emit(a: string, e: string, l: string) {
@@ -79,6 +85,7 @@ export function PhoneInput({ value, onChange, className = '' }: PhoneInputProps)
         data-phone-area
         type="tel"
         inputMode="numeric"
+        autoComplete="off"
         placeholder="555"
         maxLength={3}
         value={area}
@@ -91,6 +98,7 @@ export function PhoneInput({ value, onChange, className = '' }: PhoneInputProps)
         ref={exchangeRef}
         type="tel"
         inputMode="numeric"
+        autoComplete="off"
         placeholder="123"
         maxLength={3}
         value={exchange}
@@ -104,6 +112,7 @@ export function PhoneInput({ value, onChange, className = '' }: PhoneInputProps)
         ref={lineRef}
         type="tel"
         inputMode="numeric"
+        autoComplete="off"
         placeholder="4567"
         maxLength={4}
         value={line}

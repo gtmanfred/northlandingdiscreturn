@@ -49,6 +49,12 @@ class OwnerRepository:
         await self.db.refresh(owner)
         return owner
 
+    async def mark_welcome_sent(self, owner: Owner) -> Owner:
+        owner.welcome_sent_at = func.now()
+        await self.db.flush()
+        await self.db.refresh(owner)
+        return owner
+
     async def suggest_first_names(self, limit: int = 200) -> list[str]:
         result = await self.db.execute(
             select(Owner.first_name)

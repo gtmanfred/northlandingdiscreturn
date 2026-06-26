@@ -1,7 +1,7 @@
 """disc colors as ordered tag array
 
-Revision ID: b1c2d3e4f5a6
-Revises: a73e1f8ff264
+Revision ID: c2d3e4f5a6b7
+Revises: b1c2d3e4f5a6
 Create Date: 2026-06-26 13:30:00.000000
 
 """
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "b1c2d3e4f5a6"
-down_revision: Union[str, Sequence[str], None] = "a73e1f8ff264"
+revision: str = "c2d3e4f5a6b7"
+down_revision: Union[str, Sequence[str], None] = "b1c2d3e4f5a6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

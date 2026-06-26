@@ -65,6 +65,17 @@ async def test_disc_owner_id_nullable(db):
 from app.repositories.owner import OwnerRepository
 
 
+async def test_repo_mark_welcome_sent(db):
+    repo = OwnerRepository(db)
+    owner = await repo.resolve_or_create(first_name="W", last_name="", phone_number="+15554440000")
+    await db.commit()
+    assert owner.welcome_sent_at is None
+    await repo.mark_welcome_sent(owner)
+    await db.commit()
+    await db.refresh(owner)
+    assert owner.welcome_sent_at is not None
+
+
 async def test_repo_resolve_creates_new_owner(db):
     repo = OwnerRepository(db)
     owner = await repo.resolve_or_create(first_name="Jill", last_name="", phone_number="+15551111111")
@@ -164,6 +175,7 @@ from app.models.pickup_event import SMSJob
 
 
 async def test_heads_up_enqueued_on_first_found_disc(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
 
@@ -172,18 +184,19 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
     )
     await db.commit()
 
-    sent = await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", colors=["red"])
+    sent = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent is True
-    await db.refresh(owner)
-    assert owner.heads_up_sent_at is not None
 
     jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
     assert len(jobs) == 1
     assert "North Landing Disc Return" in jobs[0].message
+    assert "Innova Destroyer (red)" in jobs[0].message
 
 
 async def test_heads_up_greets_there_when_name_blank(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
 
@@ -192,7 +205,8 @@ async def test_heads_up_greets_there_when_name_blank(db):
     )
     await db.commit()
 
-    await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", colors=["red"])
+    await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
 
     jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
@@ -201,30 +215,34 @@ async def test_heads_up_greets_there_when_name_blank(db):
     assert jobs[0].message.startswith("Hi there, this is North Landing")
 
 
-async def test_heads_up_not_re_enqueued(db):
+async def test_heads_up_enqueued_per_found_disc(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
     owner = await OwnerRepository(db).resolve_or_create(
         first_name="Jay", last_name="", phone_number="+15558000002"
     )
     await db.commit()
-    await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", colors=["red"])
+    await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
-    sent_again = await maybe_enqueue_heads_up(owner=owner, is_found=True, db=db)
+    sent_again = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
-    assert sent_again is False
+    assert sent_again is True
     jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
-    assert len(jobs) == 1
+    assert len(jobs) == 2
 
 
 async def test_heads_up_not_enqueued_for_wishlist(db):
+    import types
     from app.services.heads_up import maybe_enqueue_heads_up
     from app.repositories.owner import OwnerRepository
     owner = await OwnerRepository(db).resolve_or_create(
         first_name="Kay", last_name="", phone_number="+15558000003"
     )
     await db.commit()
-    sent = await maybe_enqueue_heads_up(owner=owner, is_found=False, db=db)
+    disc = types.SimpleNamespace(is_found=False, manufacturer="Innova", name="Destroyer", colors=["red"])
+    sent = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent is False
     await db.refresh(owner)
@@ -270,6 +288,8 @@ async def test_notification_groups_by_owner(db):
     # created via the repo, not the admin create flow).
     phones = sorted(j.phone_number for j in jobs)
     assert phones == ["+15559000001", "+15559000002"]
+    # Every pickup notification points owners to discreturn.nl to view their discs.
+    assert all("discreturn.nl" in j.message for j in jobs)
 
 
 async def test_notification_message_collapses_colors_to_comma_string(db):

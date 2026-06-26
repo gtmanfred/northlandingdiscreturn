@@ -16,6 +16,10 @@ primary_region = 'ord'
   FRONTEND_URL = 'https://discreturn.nl'
   SUPABASE_BUCKET = 'disc-photos'
 
+[processes]
+  app = "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'"
+  worker = 'uv run python -m worker.main'
+
 [http_service]
   internal_port = 8000
   force_https = true
@@ -29,3 +33,11 @@ primary_region = 'ord'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
+  processes = ['app']
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
+  processes = ['worker']

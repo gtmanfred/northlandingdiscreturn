@@ -12,6 +12,7 @@ from app.repositories.owner import OwnerRepository
 from app.repositories.user import UserRepository
 from app.schemas.disc import DiscOut, DiscCreate, DiscUpdate, DiscPage, DiscPhotoOut
 from app.services.heads_up import maybe_enqueue_heads_up
+from app.services.welcome import maybe_enqueue_welcome
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
 
@@ -90,7 +91,8 @@ async def create_disc(
     )
 
     if owner_obj is not None:
-        await maybe_enqueue_heads_up(owner=owner_obj, is_found=disc.is_found, db=db)
+        await maybe_enqueue_welcome(owner=owner_obj, db=db)
+        await maybe_enqueue_heads_up(owner=owner_obj, disc=disc, db=db)
 
     await db.commit()
     return await repo.get_by_id(disc.id)
