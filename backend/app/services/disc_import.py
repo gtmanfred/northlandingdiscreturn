@@ -1,5 +1,5 @@
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 import openpyxl
 from app.phone import normalize_phone
@@ -102,3 +102,79 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
             error=error,
         ))
     return rows
+
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
+
+
+@dataclass
+class ImportSummary:
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: list[dict] = field(default_factory=list)
+
+
+async def import_rows(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSummary:
+    summary = ImportSummary()
+    disc_repo = DiscRepository(db)
+    owner_repo = OwnerRepository(db)
+
+    for row in rows:
+        if row.error or row.input_date is None:
+            summary.errors.append({"row": row.row_number, "reason": row.error or "no date found"})
+            continue
+
+        owner_id = None
+        if row.phone or row.first_name or row.last_name:
+            owner = await owner_repo.resolve_or_create(
+                first_name=row.first_name,
+                last_name=row.last_name,
+                phone_number=row.phone,
+            )
+            owner_id = owner.id
+
+        existing = await disc_repo.find_by_import_key(
+            input_date=row.input_date,
+            manufacturer=row.manufacturer,
+            name=row.model,
+            colors=row.colors,
+            phone=row.phone,
+        )
+
+        if existing is None:
+            disc = await disc_repo.create(
+                manufacturer=row.manufacturer,
+                name=row.model,
+                colors=row.colors,
+                input_date=row.input_date,
+                owner_id=owner_id,
+                notes=row.notes,
+            )
+            if row.returned:
+                await disc_repo.update(
+                    disc, is_returned=True, returned_date=row.returned_date
+                )
+            summary.created += 1
+        else:
+            updates = {}
+            if (existing.notes or None) != (row.notes or None):
+                updates["notes"] = row.notes
+            if [c.strip().lower() for c in existing.colors] != [c.strip().lower() for c in row.colors]:
+                updates["colors"] = row.colors
+            if existing.owner_id != owner_id:
+                updates["owner_id"] = owner_id
+            # one-way return: only ever set returned, never clear
+            if row.returned and not existing.is_returned:
+                updates["is_returned"] = True
+                updates["returned_date"] = row.returned_date
+            if updates:
+                await disc_repo.update(existing, **updates)
+                summary.updated += 1
+            else:
+                summary.skipped += 1
+
+    await db.flush()
+    return summary

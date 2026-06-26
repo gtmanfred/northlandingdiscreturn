@@ -172,6 +172,31 @@ class DiscRepository:
         )
         return list(result.scalars().all())
 
+    async def find_by_import_key(
+        self, *, input_date, manufacturer, name, colors, phone
+    ) -> Disc | None:
+        stmt = (
+            select(Disc)
+            .options(selectinload(Disc.owner), selectinload(Disc.photos))
+            .where(Disc.input_date == input_date)
+        )
+        result = await self.db.execute(stmt)
+        target_mfr = manufacturer.strip().lower()
+        target_model = name.strip().lower()
+        target_colors = [c.strip().lower() for c in colors]
+        for disc in result.scalars().all():
+            if disc.manufacturer.strip().lower() != target_mfr:
+                continue
+            if disc.name.strip().lower() != target_model:
+                continue
+            if [c.strip().lower() for c in disc.colors] != target_colors:
+                continue
+            disc_phone = disc.owner.phone_number if disc.owner else None
+            if disc_phone != phone:
+                continue
+            return disc
+        return None
+
     async def update(self, disc: Disc, **kwargs) -> Disc:
         for key, value in kwargs.items():
             setattr(disc, key, value)

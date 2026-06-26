@@ -105,3 +105,66 @@ def test_missing_current_sheet_raises():
     wb.save(buf)
     with pytest.raises(ValueError):
         parse_current_sheet(buf.getvalue())
+
+
+import pytest
+from datetime import date as _date
+from app.services.disc_import import import_rows, ParsedDiscRow, ImportSummary
+from app.repositories.disc import DiscRepository
+
+
+def _row(**kw):
+    base = dict(
+        row_number=4, first_name="Jane", last_name="Doe", phone="+15551234567",
+        manufacturer="Innova", model="Teebird", colors=["white"], notes="x",
+        input_date=_date(2026, 6, 1), returned=False, returned_date=None, error=None,
+    )
+    base.update(kw)
+    return ParsedDiscRow(**base)
+
+
+@pytest.mark.asyncio
+async def test_import_creates_then_updates(db):
+    s1 = await import_rows([_row()], db)
+    assert s1.created == 1 and s1.updated == 0
+
+    # same key, changed notes -> update, not create
+    s2 = await import_rows([_row(notes="changed")], db)
+    assert s2.created == 0 and s2.updated == 1
+
+    repo = DiscRepository(db)
+    rows = await repo.list_for_export()
+    assert len(rows) == 1
+    assert rows[0].notes == "changed"
+
+
+@pytest.mark.asyncio
+async def test_import_returned_is_one_way(db):
+    await import_rows([_row()], db)
+    repo = DiscRepository(db)
+    disc = (await repo.list_for_export())[0]
+    # mark returned in-app
+    await repo.update(disc, is_returned=True, returned_date=_date(2026, 6, 5))
+    await db.flush()
+    # re-import the row still showing active -> must NOT un-return
+    await import_rows([_row()], db)
+    disc = (await repo.list_for_export())[0]
+    assert disc.is_returned is True
+
+
+@pytest.mark.asyncio
+async def test_import_marks_returned_from_sheet(db):
+    await import_rows([_row()], db)
+    await import_rows([_row(returned=True, returned_date=_date(2026, 6, 9))], db)
+    repo = DiscRepository(db)
+    disc = (await repo.list_for_export())[0]
+    assert disc.is_returned is True
+    assert disc.returned_date == _date(2026, 6, 9)
+
+
+@pytest.mark.asyncio
+async def test_import_reports_row_errors(db):
+    summary = await import_rows([_row(error="missing or invalid Date found")], db)
+    assert summary.created == 0
+    assert len(summary.errors) == 1
+    assert summary.errors[0]["row"] == 4
