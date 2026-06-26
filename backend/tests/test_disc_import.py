@@ -1,8 +1,9 @@
 import io
-from datetime import date
+from datetime import date as _date
 import openpyxl
 import pytest
-from app.services.disc_import import parse_current_sheet, ParsedDiscRow
+from app.services.disc_import import parse_current_sheet, ParsedDiscRow, import_rows, ImportSummary
+from app.repositories.disc import DiscRepository
 
 
 def _make_sheet(data_rows):
@@ -23,7 +24,7 @@ def _make_sheet(data_rows):
 def test_parse_basic_row():
     data = _make_sheet([
         ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple trans",
-         "Ed no prev", None, date(2026, 6, 6), None, None],
+         "Ed no prev", None, _date(2026, 6, 6), None, None],
     ])
     rows = parse_current_sheet(data)
     assert len(rows) == 1
@@ -35,7 +36,7 @@ def test_parse_basic_row():
     assert row.model == "Heat"
     assert row.colors == ["purple", "trans"]
     assert row.notes == "Ed no prev"
-    assert row.input_date == date(2026, 6, 6)
+    assert row.input_date == _date(2026, 6, 6)
     assert row.returned is False
     assert row.error is None
 
@@ -43,24 +44,24 @@ def test_parse_basic_row():
 def test_parse_returned_row_from_date():
     data = _make_sheet([
         ["?", None, "Innova", "Roc", "blue", "donate", None,
-         date(2026, 1, 1), date(2026, 2, 1), None],
+         _date(2026, 1, 1), _date(2026, 2, 1), None],
     ])
     row = parse_current_sheet(data)[0]
     assert row.first_name == ""
     assert row.last_name == ""
     assert row.phone is None
     assert row.returned is True
-    assert row.returned_date == date(2026, 2, 1)
+    assert row.returned_date == _date(2026, 2, 1)
 
 
 def test_parse_returned_row_from_code():
     data = _make_sheet([
         ["Sam", "404-353-5987", "Axiom", "Fireball", "pink", "x", "R",
-         date(2026, 1, 1), None, None],
+         _date(2026, 1, 1), None, None],
     ])
     row = parse_current_sheet(data)[0]
     assert row.returned is True
-    assert row.returned_date == date(2026, 1, 1)  # falls back to date found
+    assert row.returned_date == _date(2026, 1, 1)  # falls back to date found
 
 
 def test_missing_date_found_sets_error():
@@ -74,7 +75,7 @@ def test_missing_date_found_sets_error():
 def test_code_mr_not_returned():
     data = _make_sheet([
         ["Sam", "404-353-5987", "Axiom", "Fireball", "pink", "x", "MR",
-         date(2026, 1, 1), None, None],
+         _date(2026, 1, 1), None, None],
     ])
     row = parse_current_sheet(data)[0]
     assert row.returned is False
@@ -83,7 +84,7 @@ def test_code_mr_not_returned():
 def test_garbage_code_not_returned():
     data = _make_sheet([
         ["Sam", "404-353-5987", "Axiom", "Fireball", "pink", "x",
-         "brvscr.searchtofind.net", date(2026, 1, 1), None, None],
+         "brvscr.searchtofind.net", _date(2026, 1, 1), None, None],
     ])
     row = parse_current_sheet(data)[0]
     assert row.returned is False
@@ -92,7 +93,7 @@ def test_garbage_code_not_returned():
 def test_invalid_phone_is_none_no_raise():
     data = _make_sheet([
         ["Sam", "not-a-phone", "Axiom", "Fireball", "pink", "x", None,
-         date(2026, 1, 1), None, None],
+         _date(2026, 1, 1), None, None],
     ])
     row = parse_current_sheet(data)[0]
     assert row.phone is None
@@ -105,12 +106,6 @@ def test_missing_current_sheet_raises():
     wb.save(buf)
     with pytest.raises(ValueError):
         parse_current_sheet(buf.getvalue())
-
-
-import pytest
-from datetime import date as _date
-from app.services.disc_import import import_rows, ParsedDiscRow, ImportSummary
-from app.repositories.disc import DiscRepository
 
 
 def _row(**kw):
@@ -168,3 +163,18 @@ async def test_import_reports_row_errors(db):
     assert summary.created == 0
     assert len(summary.errors) == 1
     assert summary.errors[0]["row"] == 4
+
+
+@pytest.mark.asyncio
+async def test_import_create_branch_already_returned(db):
+    """Brand-new row whose sheet already shows returned=True must be created with is_returned set."""
+    ret_date = _date(2026, 5, 20)
+    summary = await import_rows([_row(returned=True, returned_date=ret_date)], db)
+    assert summary.created == 1
+
+    repo = DiscRepository(db)
+    discs = await repo.list_for_export()
+    assert len(discs) == 1
+    disc = discs[0]
+    assert disc.is_returned is True
+    assert disc.returned_date == ret_date

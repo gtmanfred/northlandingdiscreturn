@@ -2,7 +2,10 @@ import io
 from dataclasses import dataclass, field
 from datetime import date, datetime
 import openpyxl
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.phone import normalize_phone
+from app.repositories.disc import DiscRepository
+from app.repositories.owner import OwnerRepository
 
 SHEET_NAME = "Current"
 HEADER_KEYWORD = "Name"
@@ -102,11 +105,6 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
             error=error,
         ))
     return rows
-
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.repositories.disc import DiscRepository
-from app.repositories.owner import OwnerRepository
 
 
 @dataclass

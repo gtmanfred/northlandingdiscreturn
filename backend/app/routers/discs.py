@@ -17,7 +17,7 @@ from app.services.heads_up import maybe_enqueue_heads_up
 from app.services.welcome import maybe_enqueue_welcome
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
-from app.services.disc_export import build_current_sheet_workbook, DISC_EXPORT_COLUMNS
+from app.services.disc_export import build_current_sheet_workbook
 from app.services.disc_import import parse_current_sheet, import_rows
 
 router = APIRouter()

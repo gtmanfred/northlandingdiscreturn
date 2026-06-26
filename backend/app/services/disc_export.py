@@ -13,7 +13,7 @@ DATE_COLUMNS = {"Date found", "Date returned", "Date contacted"}
 
 def build_current_sheet_workbook(rows: list[dict]) -> bytes:
     """Build an .xlsx mirroring the Current sheet layout. Returns the file bytes."""
-    wb = Workbook(iso_dates=True)
+    wb = Workbook(iso_dates=True)  # iso_dates=True makes openpyxl store Python date objects as real date cells (not datetime), so they round-trip correctly on re-import
     ws = wb.active
     ws.title = "Current"
     ws.append([TITLE])
