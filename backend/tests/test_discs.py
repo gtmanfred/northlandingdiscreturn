@@ -548,6 +548,43 @@ async def test_last_contact_dates(db):
     assert result[disc.id] == datetime(2026, 6, 2, tzinfo=timezone.utc)
 
 
+async def test_export_xlsx_admin_only(db, client):
+    from app.repositories.owner import OwnerRepository
+    admin = await make_admin(db, name="ExportAdmin", email="exp@x.com", google_id="g-exp")
+
+    owner = await OwnerRepository(db).resolve_or_create(
+        first_name="Jane", last_name="Doe", phone_number="+15551234567"
+    )
+    await db.flush()
+    repo = DiscRepository(db)
+    await repo.create(
+        manufacturer="Innova", name="Teebird", colors=["white"],
+        input_date=date(2026, 6, 1), owner_id=owner.id, notes="no prev",
+    )
+    await db.flush()
+
+    r = await client.get("/discs/export", headers=admin_headers(admin.id))
+    assert r.status_code == 200
+    assert "spreadsheetml" in r.headers["content-type"]
+
+    import io, openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(r.content))
+    grid = list(wb.active.iter_rows(values_only=True))
+    header = grid[1]
+    body = dict(zip(header, grid[2]))
+    assert body["Mfr"] == "Innova"
+    assert body["Name"] == "Jane Doe"
+    assert body["Color"] == "white"
+    assert body["Other"] == "no prev"
+
+
+async def test_export_forbidden_for_non_admin(db, client):
+    user = await UserRepository(db).create(name="Plain", email="plain@x.com", google_id="g-plain")
+    await db.flush()
+    r = await client.get("/discs/export", headers=admin_headers(user.id))
+    assert r.status_code == 403
+
+
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository
