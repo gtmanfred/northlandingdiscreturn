@@ -514,6 +514,40 @@ async def test_returned_date_stamped_and_cleared(db, client):
     assert r.json()["returned_date"] is None
 
 
+async def test_list_for_export_ignores_pagination(db):
+    repo = DiscRepository(db)
+    for i in range(3):
+        await repo.create(
+            manufacturer="Innova", name=f"D{i}", colors=["Red"], input_date=date.today()
+        )
+    await db.flush()
+    rows = await repo.list_for_export(is_found=None, is_returned=None, owner_name=None)
+    assert len(rows) == 3
+
+
+async def test_last_contact_dates(db):
+    from app.models.pickup_event import PickupEvent, DiscPickupNotification
+    from datetime import datetime, timezone
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Aviar", colors=["Red"], input_date=date.today()
+    )
+    event = PickupEvent(
+        start_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        end_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+    db.add(event)
+    await db.flush()
+    n = DiscPickupNotification(
+        disc_id=disc.id, pickup_event_id=event.id,
+        sent_at=datetime(2026, 6, 2, tzinfo=timezone.utc),
+    )
+    db.add(n)
+    await db.flush()
+    result = await repo.last_contact_dates([disc.id])
+    assert result[disc.id] == datetime(2026, 6, 2, tzinfo=timezone.utc)
+
+
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository

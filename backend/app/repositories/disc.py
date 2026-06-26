@@ -46,6 +46,19 @@ class DiscRepository:
         )
         return result.scalar_one_or_none()
 
+    @staticmethod
+    def _apply_filters(stmt, *, is_found, is_returned, owner_name):
+        from app.models.owner import Owner
+        if owner_name is not None:
+            stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
+                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
+            )
+        if is_found is not None:
+            stmt = stmt.where(Disc.is_found == is_found)
+        if is_returned is not None:
+            stmt = stmt.where(Disc.is_returned == is_returned)
+        return stmt
+
     async def list_all(
         self,
         *,
@@ -55,7 +68,6 @@ class DiscRepository:
         is_returned: bool | None = None,
         owner_name: str | None = None,
     ) -> list[Disc]:
-        from app.models.owner import Owner
         offset = (page - 1) * page_size
         stmt = (
             select(Disc)
@@ -64,16 +76,39 @@ class DiscRepository:
             .offset(offset)
             .limit(page_size)
         )
-        if is_found is not None:
-            stmt = stmt.where(Disc.is_found == is_found)
-        if is_returned is not None:
-            stmt = stmt.where(Disc.is_returned == is_returned)
-        if owner_name is not None:
-            stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
-                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
-            )
+        stmt = self._apply_filters(
+            stmt, is_found=is_found, is_returned=is_returned, owner_name=owner_name
+        )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_for_export(
+        self, *, is_found=None, is_returned=None, owner_name=None
+    ) -> list[Disc]:
+        stmt = (
+            select(Disc)
+            .options(selectinload(Disc.photos), selectinload(Disc.owner))
+            .order_by(Disc.created_at.desc())
+        )
+        stmt = self._apply_filters(
+            stmt, is_found=is_found, is_returned=is_returned, owner_name=owner_name
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def last_contact_dates(self, disc_ids):
+        from app.models.pickup_event import DiscPickupNotification
+        if not disc_ids:
+            return {}
+        result = await self.db.execute(
+            select(
+                DiscPickupNotification.disc_id,
+                func.max(DiscPickupNotification.sent_at),
+            )
+            .where(DiscPickupNotification.disc_id.in_(disc_ids))
+            .group_by(DiscPickupNotification.disc_id)
+        )
+        return {disc_id: sent_at for disc_id, sent_at in result.all()}
 
     async def list_by_owner_ids(self, owner_ids: list[uuid.UUID]) -> list[Disc]:
         if not owner_ids:
@@ -107,16 +142,10 @@ class DiscRepository:
         is_returned: bool | None = None,
         owner_name: str | None = None,
     ) -> int:
-        from app.models.owner import Owner
         stmt = select(func.count()).select_from(Disc)
-        if owner_name is not None:
-            stmt = stmt.join(Owner, Disc.owner_id == Owner.id).where(
-                func.concat(Owner.first_name, " ", Owner.last_name).ilike(f"%{owner_name}%")
-            )
-        if is_found is not None:
-            stmt = stmt.where(Disc.is_found == is_found)
-        if is_returned is not None:
-            stmt = stmt.where(Disc.is_returned == is_returned)
+        stmt = self._apply_filters(
+            stmt, is_found=is_found, is_returned=is_returned, owner_name=owner_name
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one()
 
