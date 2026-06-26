@@ -1,6 +1,7 @@
 # backend/app/routers/discs.py
 import asyncio
 import uuid
+from datetime import date
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -133,6 +134,12 @@ async def update_disc(
             payload["owner_id"] = new_owner.id
         else:
             payload["owner_id"] = None
+
+    if "is_returned" in fields_set:
+        if body.is_returned and not disc.is_returned:
+            payload["returned_date"] = date.today()
+        elif body.is_returned is False and disc.is_returned:
+            payload["returned_date"] = None
 
     if not payload:
         raise HTTPException(status_code=422, detail="No fields provided for update")

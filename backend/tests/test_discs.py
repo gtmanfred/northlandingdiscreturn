@@ -495,6 +495,25 @@ async def test_heads_up_skipped_when_no_phone(db):
     assert enqueued is False
 
 
+async def test_returned_date_stamped_and_cleared(db, client):
+    admin = await make_admin(db, name="AdminRD", email="adminrd@example.com", google_id="g-adminrd")
+    headers = admin_headers(admin.id)
+
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Teebird", colors=["White"], input_date=date.today()
+    )
+    await db.flush()
+
+    r = await client.patch(f"/discs/{disc.id}", json={"is_returned": True}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["returned_date"] == date.today().isoformat()
+
+    r = await client.patch(f"/discs/{disc.id}", json={"is_returned": False}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["returned_date"] is None
+
+
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository
