@@ -79,7 +79,7 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
         input_date = _as_date(found)
         ret_date = _as_date(returned_dt)
         code_str = (str(code).strip().upper() if code else "")
-        returned = ret_date is not None or "R" in code_str
+        returned = ret_date is not None or code_str == "R"
         if returned and ret_date is None:
             ret_date = input_date
 

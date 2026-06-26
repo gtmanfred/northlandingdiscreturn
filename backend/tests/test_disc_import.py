@@ -71,6 +71,33 @@ def test_missing_date_found_sets_error():
     assert row.error is not None
 
 
+def test_code_mr_not_returned():
+    data = _make_sheet([
+        ["Sam", "404-353-5987", "Axiom", "Fireball", "pink", "x", "MR",
+         date(2026, 1, 1), None, None],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.returned is False
+
+
+def test_garbage_code_not_returned():
+    data = _make_sheet([
+        ["Sam", "404-353-5987", "Axiom", "Fireball", "pink", "x",
+         "brvscr.searchtofind.net", date(2026, 1, 1), None, None],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.returned is False
+
+
+def test_invalid_phone_is_none_no_raise():
+    data = _make_sheet([
+        ["Sam", "not-a-phone", "Axiom", "Fireball", "pink", "x", None,
+         date(2026, 1, 1), None, None],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.phone is None
+
+
 def test_missing_current_sheet_raises():
     wb = openpyxl.Workbook()
     wb.active.title = "Other"
