@@ -18,6 +18,7 @@ from app.services.welcome import maybe_enqueue_welcome
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
 from app.services.disc_export import build_current_sheet_workbook, DISC_EXPORT_COLUMNS
+from app.services.disc_import import parse_current_sheet, import_rows
 
 router = APIRouter()
 
@@ -148,6 +149,27 @@ async def export_discs(
             "Content-Disposition": f'attachment; filename="north-landing-discs-{today}.xlsx"'
         },
     )
+
+
+@router.post("/import", operation_id="importDiscs")
+async def import_discs(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...),
+):
+    content = await file.read()
+    try:
+        rows = parse_current_sheet(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    summary = await import_rows(rows, db)
+    await db.commit()
+    return {
+        "created": summary.created,
+        "updated": summary.updated,
+        "skipped": summary.skipped,
+        "errors": summary.errors,
+    }
 
 
 @router.patch("/{disc_id}", response_model=DiscOut, operation_id="updateDisc")
