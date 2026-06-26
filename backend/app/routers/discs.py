@@ -82,7 +82,7 @@ async def create_disc(
     disc = await repo.create(
         manufacturer=body.manufacturer,
         name=body.name,
-        color=body.color,
+        colors=body.colors,
         input_date=body.input_date,
         owner_id=owner_id,
         is_clear=body.is_clear,

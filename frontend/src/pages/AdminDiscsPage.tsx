@@ -230,7 +230,7 @@ export function AdminDiscsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground">{disc.name}</p>
                       <p className="text-sm text-muted-foreground">{disc.manufacturer}</p>
-                      <p className="text-sm text-muted-foreground">{disc.color}</p>
+                      <p className="text-sm text-muted-foreground">{disc.colors.join(', ')}</p>
                       {disc.owner?.name && <p className="text-sm">{disc.owner.name}</p>}
                       {disc.owner?.phone_number && (
                         <p className="text-sm text-muted-foreground">{disc.owner.phone_number}</p>
@@ -309,7 +309,7 @@ export function AdminDiscsPage() {
                         <div className="font-medium text-foreground">{disc.name}</div>
                         <div className="text-muted-foreground">{disc.manufacturer}</div>
                       </TableCell>
-                      <TableCell>{disc.color}</TableCell>
+                      <TableCell>{disc.colors.join(', ')}</TableCell>
                       <TableCell>{disc.owner?.phone_number ?? '—'}</TableCell>
                       <TableCell>{disc.owner?.name ?? '—'}</TableCell>
                       <TableCell className="max-w-[16rem] truncate text-muted-foreground" title={disc.notes ?? ''}>

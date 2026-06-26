@@ -44,7 +44,7 @@ describe('MyDiscsPage', () => {
   it('shows disc details when data loads', () => {
     vi.mocked(useGetMyDiscs).mockReturnValue({
       isLoading: false,
-      data: [{ id: '1', manufacturer: 'Innova', name: 'Destroyer', color: 'Red', is_returned: false, photos: [] }],
+      data: [{ id: '1', manufacturer: 'Innova', name: 'Destroyer', colors: ['Red'], is_returned: false, photos: [] }],
     } as any)
     render(<MyDiscsPage />, { wrapper })
     expect(screen.getByText('Destroyer')).toBeInTheDocument()
@@ -89,8 +89,8 @@ describe('MyDiscsPage', () => {
   })
 
   const twoDiscs = [
-    { id: '1', manufacturer: 'Innova', name: 'Destroyer', color: 'Red', is_returned: false, photos: [] },
-    { id: '2', manufacturer: 'Discraft', name: 'Buzzz', color: 'Blue', is_returned: true, photos: [] },
+    { id: '1', manufacturer: 'Innova', name: 'Destroyer', colors: ['Red'], is_returned: false, photos: [] },
+    { id: '2', manufacturer: 'Discraft', name: 'Buzzz', colors: ['Blue'], is_returned: true, photos: [] },
   ]
 
   it('defaults to showing only discs awaiting pickup', () => {
@@ -120,7 +120,7 @@ describe('MyDiscsPage', () => {
 
   it('shows a no-match message when the filter hides every disc', async () => {
     const onlyReturned = [
-      { id: '2', manufacturer: 'Discraft', name: 'Buzzz', color: 'Blue', is_returned: true, photos: [] },
+      { id: '2', manufacturer: 'Discraft', name: 'Buzzz', colors: ['Blue'], is_returned: true, photos: [] },
     ]
     vi.mocked(useGetMyDiscs).mockReturnValue({ isLoading: false, data: onlyReturned } as any)
     render(<MyDiscsPage />, { wrapper })

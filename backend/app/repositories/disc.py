@@ -16,7 +16,7 @@ class DiscRepository:
         *,
         manufacturer: str,
         name: str,
-        color: str,
+        colors: list[str],
         input_date: date,
         owner_id: uuid.UUID | None = None,
         is_clear: bool = False,
@@ -26,7 +26,7 @@ class DiscRepository:
         disc = Disc(
             manufacturer=manufacturer,
             name=name,
-            color=color,
+            colors=colors,
             input_date=input_date,
             owner_id=owner_id,
             is_clear=is_clear,

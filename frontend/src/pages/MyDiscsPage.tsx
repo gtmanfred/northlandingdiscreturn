@@ -90,11 +90,15 @@ export function MyDiscsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-foreground">{disc.name}</span>
                       <span className="text-sm text-muted-foreground">{disc.manufacturer}</span>
-                      <span
-                        className="inline-block h-4 w-4 rounded-full border border-border"
-                        style={{ backgroundColor: disc.color.toLowerCase() }}
-                        title={disc.color}
-                      />
+                      <span className="inline-flex items-center gap-1" title={disc.colors.join(', ')}>
+                        {disc.colors.map((c, i) => (
+                          <span
+                            key={`${c}-${i}`}
+                            className="inline-block h-4 w-4 rounded-full border border-border"
+                            style={{ backgroundColor: c.toLowerCase() }}
+                          />
+                        ))}
+                      </span>
                     </div>
                     {disc.owner?.name && (
                       <p className="mt-0.5 text-sm text-muted-foreground">Owner: {disc.owner.name}</p>

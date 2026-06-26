@@ -31,6 +31,21 @@ async def get_suggestions(
             return await repo.suggest_first_names()
         return await repo.suggest_last_names()
 
+    if field == "color":
+        # colors is an array column; surface distinct individual tags so chips
+        # autocomplete on single colors, not whole combinations.
+        tags = select(func.unnest(Disc.colors).label("val")).subquery()
+        distinct_tags = (
+            select(distinct(tags.c.val).label("val"))
+            .where(tags.c.val.is_not(None))
+            .where(tags.c.val != "")
+            .subquery()
+        )
+        result = await db.execute(
+            select(distinct_tags.c.val).order_by(func.lower(distinct_tags.c.val))
+        )
+        return [row[0] for row in result.all()]
+
     col = getattr(Disc, field)
     subq = (
         select(distinct(col).label("val"))
@@ -86,3 +101,33 @@ async def get_phone_suggestions(
             registered[number] = PhoneSuggestion(number=number, label=number)
 
     return list(registered.values())
+
+
+class OwnerPhoneSuggestion(BaseModel):
+    first_name: str
+    last_name: str
+    phone_number: str
+
+
+@router.get(
+    "/owners-by-phone",
+    response_model=list[OwnerPhoneSuggestion],
+    operation_id="getOwnersByPhone",
+)
+async def get_owners_by_phone(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    digits: Annotated[str, Query()] = "",
+) -> list[OwnerPhoneSuggestion]:
+    digits = "".join(ch for ch in digits if ch.isdigit())
+    if len(digits) < 4:
+        return []
+    owners = await OwnerRepository(db).list_by_phone_suffix(digits)
+    return [
+        OwnerPhoneSuggestion(
+            first_name=o.first_name,
+            last_name=o.last_name,
+            phone_number=o.phone_number,
+        )
+        for o in owners
+    ]

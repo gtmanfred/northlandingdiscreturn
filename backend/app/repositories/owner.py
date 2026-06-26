@@ -75,6 +75,18 @@ class OwnerRepository:
         )
         return [row[0] for row in result.all()]
 
+    async def list_by_phone_suffix(
+        self, digits: str, *, limit: int = 10
+    ) -> list[Owner]:
+        """Owners whose stored phone ends with the given digits (true last-N match)."""
+        result = await self.db.execute(
+            select(Owner)
+            .where(Owner.phone_number.like(f"%{digits}"))
+            .order_by(Owner.last_name, Owner.first_name)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def list_phones_for_name(
         self, *, first_name: str, last_name: str
     ) -> list[str]:

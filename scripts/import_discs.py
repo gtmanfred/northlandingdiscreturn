@@ -69,7 +69,7 @@ class ParsedRow:
     phone: str | None
     manufacturer: str
     model: str
-    color: str
+    colors: list[str]
     date_found: date
     date_found_missing: bool
     date_returned: date | None
@@ -123,6 +123,8 @@ def parse_row(row: tuple) -> ParsedRow | None:
     if not any((name, phone_raw, manufacturer, model, color, date_found, date_returned)):
         return None
 
+    # Split the free-text color into ordered tags on commas/whitespace.
+    colors = [tok for tok in re.split(r"[,\s]+", (color or "").strip()) if tok]
     color_lower = (color or "").lower()
     is_clear = any(token in color_lower for token in ("clear", "trans", "tint"))
 
@@ -137,7 +139,7 @@ def parse_row(row: tuple) -> ParsedRow | None:
         phone=_try_phone(phone_raw),
         manufacturer=manufacturer or "",
         model=model or "",
-        color=color or "",
+        colors=colors,
         date_found=date_found or date.today(),
         date_found_missing=date_found is None,
         date_returned=date_returned,
@@ -149,7 +151,7 @@ def build_create_payload(parsed: ParsedRow) -> dict:
     payload = {
         "manufacturer": parsed.manufacturer,
         "name": parsed.model,
-        "color": parsed.color,
+        "colors": parsed.colors,
         "input_date": parsed.date_found.isoformat(),
         "is_clear": parsed.is_clear,
         "is_found": True,

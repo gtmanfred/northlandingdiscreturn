@@ -49,7 +49,7 @@ async def enqueue_pickup_notifications(
     )
     for owner_id, discs in owner_discs.items():
         disc_list = ", ".join(
-            f"{d.manufacturer} {d.name} ({d.color})" for d in discs
+            f"{d.manufacturer} {d.name} ({', '.join(d.colors)})" for d in discs
         )
         phone = owner_phone[owner_id]
         if owner_is_final.get(owner_id):

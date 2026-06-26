@@ -36,7 +36,7 @@ async def test_create_disc_notification(db):
         first_name="Boss", last_name="Owner", phone_number="+15551234567"
     )
     disc = await disc_repo.create(
-        manufacturer="Innova", name="Boss", color="Blue",
+        manufacturer="Innova", name="Boss", colors=["Blue"],
         input_date=date.today(), owner_id=owner.id,
     )
     event = await event_repo.create_event(**_window(3))
@@ -54,7 +54,7 @@ async def test_count_prior_notifications(db):
         first_name="Wraith", last_name="Owner", phone_number="+15559999999"
     )
     disc = await disc_repo.create(
-        manufacturer="Innova", name="Wraith", color="Green",
+        manufacturer="Innova", name="Wraith", colors=["Green"],
         input_date=date.today(), owner_id=owner.id,
     )
     for i in range(3):
@@ -118,7 +118,7 @@ async def test_notify_pickup_event(client, db):
         first_name="Notify", last_name="Owner", phone_number="+15551112222"
     )
     await disc_repo.create(
-        manufacturer="Innova", name="Wraith", color="Blue",
+        manufacturer="Innova", name="Wraith", colors=["Blue"],
         input_date=date.today(), owner_id=owner.id, is_found=True,
     )
     await db.commit()

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, date
 from sqlalchemy import String, Boolean, Date, DateTime, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, ARRAY
 from app.models.base import Base
 
 
@@ -12,7 +12,7 @@ class Disc(Base):
     id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     manufacturer: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    color: Mapped[str] = mapped_column(String, nullable=False)
+    colors: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False)
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("owners.id", ondelete="SET NULL"),

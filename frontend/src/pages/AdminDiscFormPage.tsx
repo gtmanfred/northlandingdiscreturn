@@ -9,15 +9,17 @@ import {
   useListDiscs,
   useGetSuggestions,
   useGetPhoneSuggestions,
+  useGetOwnersByPhone,
   getListDiscsQueryKey,
   getGetSuggestionsQueryKey,
 } from '../api/northlanding'
 import { AutocompleteInput, type Suggestion } from '../components/AutocompleteInput'
+import { ColorTagInput } from '../components/ColorTagInput'
 import { PhotoUpload } from '../components/PhotoUpload'
 import { PageHeader } from '../components/PageHeader'
 import { LoadingState } from '../components/LoadingState'
 import { PhoneInput } from '../components/PhoneInput'
-import { normalizePhone } from '../utils/phone'
+import { normalizePhone, formatPhone } from '../utils/phone'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +29,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 interface DiscFormState {
   manufacturer: string
   name: string
-  color: string
+  colors: string[]
   input_date: string
   owner_first_name: string
   owner_last_name: string
@@ -41,7 +43,7 @@ interface DiscFormState {
 const defaultForm: DiscFormState = {
   manufacturer: '',
   name: '',
-  color: '',
+  colors: [],
   input_date: new Date().toISOString().slice(0, 10),
   owner_first_name: '',
   owner_last_name: '',
@@ -104,12 +106,20 @@ export function AdminDiscFormPage() {
     label: s.label,
   }))
 
+  // Reverse lookup: typing phone digits (e.g. the last 4) suggests matching
+  // owners and fills in their name + full number.
+  const phoneDigits = form.phone_number.replace(/\D/g, '')
+  const { data: ownerMatches = [] } = useGetOwnersByPhone(
+    { digits: phoneDigits },
+    { query: { enabled: phoneDigits.length >= 4 } },
+  )
+
   useEffect(() => {
     if (existingDisc) {
       setForm({
         manufacturer: existingDisc.manufacturer,
         name: existingDisc.name,
-        color: existingDisc.color,
+        colors: existingDisc.colors,
         input_date: existingDisc.input_date,
         owner_first_name: existingDisc.owner?.first_name ?? '',
         owner_last_name: existingDisc.owner?.last_name ?? '',
@@ -149,6 +159,10 @@ export function AdminDiscFormPage() {
 
   const submitForm = async (andAddAnother: boolean) => {
     setError('')
+    if (form.colors.length === 0) {
+      setError('Add at least one color.')
+      return
+    }
     let normalizedPhone: string | null = null
     if (form.phone_number) {
       try {
@@ -163,7 +177,7 @@ export function AdminDiscFormPage() {
     const payload = {
       manufacturer: form.manufacturer,
       name: form.name,
-      color: form.color,
+      colors: form.colors,
       input_date: form.input_date,
       is_clear: form.is_clear,
       is_found: form.is_found,
@@ -233,7 +247,6 @@ export function AdminDiscFormPage() {
               [
                 { field: 'manufacturer', suggestions: manufacturerSuggestions, label: 'Manufacturer' },
                 { field: 'name', suggestions: nameSuggestions, label: 'Name' },
-                { field: 'color', suggestions: colorSuggestions, label: 'Color' },
               ] as const
             ).map(({ field, suggestions, label }) => (
               <div key={field} className="space-y-1.5">
@@ -248,6 +261,20 @@ export function AdminDiscFormPage() {
                 />
               </div>
             ))}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="disc-colors">Color *</Label>
+              <ColorTagInput
+                id="disc-colors"
+                value={form.colors}
+                suggestions={colorSuggestions}
+                onChange={(colors) => setForm((f) => ({ ...f, colors }))}
+                placeholder="Type a color, press space or enter…"
+              />
+              <p className="text-xs text-muted-foreground">
+                List in order — rim/dominant color first.
+              </p>
+            </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="disc-input-date">Input date *</Label>
@@ -286,6 +313,28 @@ export function AdminDiscFormPage() {
             <div className="space-y-1.5">
               <Label htmlFor="disc-phone">Phone number</Label>
               <PhoneInput value={form.phone_number} onChange={setValue('phone_number')} />
+              {ownerMatches.length > 0 && (
+                <ul className="mt-2 space-y-1 rounded-md border border-input p-1">
+                  {ownerMatches.map((o) => (
+                    <li key={o.phone_number}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            owner_first_name: o.first_name,
+                            owner_last_name: o.last_name,
+                            phone_number: o.phone_number,
+                          }))
+                        }
+                        className="w-full rounded px-2 py-1 text-left text-sm transition-colors hover:bg-accent"
+                      >
+                        {`${o.first_name} ${o.last_name}`.trim()} — {formatPhone(o.phone_number)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {phoneSuggestions.length > 0 && (
                 <ul className="mt-2 space-y-1 rounded-md border border-input p-1">
                   {phoneSuggestions.map((s) => {

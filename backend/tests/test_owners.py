@@ -38,7 +38,7 @@ async def test_disc_has_owner_relationship(db):
     disc = Disc(
         manufacturer="Innova",
         name="Destroyer",
-        color="red",
+        colors=["red"],
         input_date=date(2026, 4, 1),
         owner_id=owner.id,
     )
@@ -53,7 +53,7 @@ async def test_disc_owner_id_nullable(db):
     disc = Disc(
         manufacturer="Innova",
         name="Wraith",
-        color="blue",
+        colors=["blue"],
         input_date=date(2026, 4, 1),
     )
     db.add(disc)
@@ -125,7 +125,7 @@ async def test_disc_out_embeds_owner(db):
         first_name="Eva", last_name="", phone_number="+15555555555"
     )
     disc = await disc_repo.create(
-        manufacturer="MVP", name="Wave", color="green",
+        manufacturer="MVP", name="Wave", colors=["green"],
         input_date=date(2026, 4, 1), owner_id=owner.id,
     )
     await db.commit()
@@ -145,7 +145,7 @@ async def test_disc_repo_create_with_owner_id(db):
         first_name="Fred", last_name="", phone_number="+15556666666"
     )
     disc = await DiscRepository(db).create(
-        manufacturer="Discraft", name="Buzzz", color="yellow",
+        manufacturer="Discraft", name="Buzzz", colors=["yellow"],
         input_date=date(2026, 4, 1), owner_id=owner.id,
     )
     await db.commit()
@@ -159,9 +159,9 @@ async def test_disc_repo_list_by_owner_ids(db):
     repo = DiscRepository(db)
     o1 = await OwnerRepository(db).resolve_or_create(first_name="G", last_name="", phone_number="+15557000001")
     o2 = await OwnerRepository(db).resolve_or_create(first_name="H", last_name="", phone_number="+15557000002")
-    d1 = await repo.create(manufacturer="m", name="n", color="c",
+    d1 = await repo.create(manufacturer="m", name="n", colors=["c"],
                            input_date=date(2026,4,1), owner_id=o1.id)
-    d2 = await repo.create(manufacturer="m", name="n", color="c",
+    d2 = await repo.create(manufacturer="m", name="n", colors=["c"],
                            input_date=date(2026,4,1), owner_id=o2.id, is_found=False)
     await db.commit()
     found = await repo.list_found_by_owner_ids([o1.id, o2.id])
@@ -184,7 +184,7 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
     )
     await db.commit()
 
-    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", color="red")
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", colors=["red"])
     sent = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent is True
@@ -195,6 +195,26 @@ async def test_heads_up_enqueued_on_first_found_disc(db):
     assert "Innova Destroyer (red)" in jobs[0].message
 
 
+async def test_heads_up_greets_there_when_name_blank(db):
+    import types
+    from app.services.heads_up import maybe_enqueue_heads_up
+    from app.repositories.owner import OwnerRepository
+
+    owner = await OwnerRepository(db).resolve_or_create(
+        first_name="", last_name="", phone_number="+15558000099"
+    )
+    await db.commit()
+
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", colors=["red"])
+    await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
+    await db.commit()
+
+    jobs = (await db.execute(select(SMSJob).where(SMSJob.phone_number == owner.phone_number))).scalars().all()
+    assert len(jobs) == 1
+    # No name on file — fall back to a generic greeting, no dangling "Hi ,".
+    assert jobs[0].message.startswith("Hi there, this is North Landing")
+
+
 async def test_heads_up_enqueued_per_found_disc(db):
     import types
     from app.services.heads_up import maybe_enqueue_heads_up
@@ -203,7 +223,7 @@ async def test_heads_up_enqueued_per_found_disc(db):
         first_name="Jay", last_name="", phone_number="+15558000002"
     )
     await db.commit()
-    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", color="red")
+    disc = types.SimpleNamespace(is_found=True, manufacturer="Innova", name="Destroyer", colors=["red"])
     await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     sent_again = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
@@ -221,7 +241,7 @@ async def test_heads_up_not_enqueued_for_wishlist(db):
         first_name="Kay", last_name="", phone_number="+15558000003"
     )
     await db.commit()
-    disc = types.SimpleNamespace(is_found=False, manufacturer="Innova", name="Destroyer", color="red")
+    disc = types.SimpleNamespace(is_found=False, manufacturer="Innova", name="Destroyer", colors=["red"])
     sent = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
     await db.commit()
     assert sent is False
@@ -245,11 +265,11 @@ async def test_notification_groups_by_owner(db):
         first_name="Mia", last_name="", phone_number="+15559000002"
     )
     disc_repo = DiscRepository(db)
-    await disc_repo.create(manufacturer="i", name="n", color="r",
+    await disc_repo.create(manufacturer="i", name="n", colors=["r"],
                            input_date=date(2026,4,1), owner_id=o1.id)
-    await disc_repo.create(manufacturer="i", name="n", color="g",
+    await disc_repo.create(manufacturer="i", name="n", colors=["g"],
                            input_date=date(2026,4,1), owner_id=o1.id)
-    await disc_repo.create(manufacturer="d", name="b", color="y",
+    await disc_repo.create(manufacturer="d", name="b", colors=["y"],
                            input_date=date(2026,4,1), owner_id=o2.id)
     event = await PickupEventRepository(db).create_event(
         start_at=datetime(2026, 5, 1, 20, 0, tzinfo=timezone.utc),
@@ -270,3 +290,34 @@ async def test_notification_groups_by_owner(db):
     assert phones == ["+15559000001", "+15559000002"]
     # Every pickup notification points owners to discreturn.nl to view their discs.
     assert all("discreturn.nl" in j.message for j in jobs)
+
+
+async def test_notification_message_collapses_colors_to_comma_string(db):
+    from datetime import date, datetime, timezone
+    from app.repositories.owner import OwnerRepository
+    from app.repositories.disc import DiscRepository
+    from app.repositories.pickup_event import PickupEventRepository
+    from app.services.notification import enqueue_pickup_notifications
+    from app.models.pickup_event import SMSJob
+    from sqlalchemy import select
+
+    owner = await OwnerRepository(db).resolve_or_create(
+        first_name="Roger", last_name="", phone_number="+15559001234"
+    )
+    await DiscRepository(db).create(
+        manufacturer="Innova", name="Wave", colors=["white", "red", "blue"],
+        input_date=date(2026, 4, 1), owner_id=owner.id,
+    )
+    event = await PickupEventRepository(db).create_event(
+        start_at=datetime(2026, 5, 1, 20, 0, tzinfo=timezone.utc),
+        end_at=datetime(2026, 5, 1, 22, 0, tzinfo=timezone.utc),
+        notes=None,
+    )
+    await db.commit()
+
+    await enqueue_pickup_notifications(event, db)
+    await db.commit()
+
+    job = (await db.execute(select(SMSJob))).scalars().one()
+    # Ordered colors collapse to a comma-separated string in the SMS body.
+    assert "Innova Wave (white, red, blue)" in job.message
