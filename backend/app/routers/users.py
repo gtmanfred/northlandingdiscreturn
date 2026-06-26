@@ -135,7 +135,7 @@ async def add_wishlist_disc(
     disc = await DiscRepository(db).create(
         manufacturer=body.manufacturer or "",
         name=body.name or "",
-        color=body.color or "",
+        colors=body.colors or [],
         input_date=date.today(),
         owner_id=owner.id,
         is_found=False,

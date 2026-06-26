@@ -1409,6 +1409,58 @@
           }
         }
       }
+    },
+    "/suggestions/owners-by-phone": {
+      "get": {
+        "tags": [
+          "suggestions"
+        ],
+        "summary": "Get Owners By Phone",
+        "operationId": "getOwnersByPhone",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "digits",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Digits"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OwnerPhoneSuggestion"
+                  },
+                  "title": "Response Getownersbyphone"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1505,9 +1557,12 @@
             "type": "string",
             "title": "Name"
           },
-          "color": {
-            "type": "string",
-            "title": "Color"
+          "colors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Colors"
           },
           "input_date": {
             "type": "string",
@@ -1573,7 +1628,7 @@
         "required": [
           "manufacturer",
           "name",
-          "color",
+          "colors",
           "input_date"
         ],
         "title": "DiscCreate"
@@ -1593,9 +1648,12 @@
             "type": "string",
             "title": "Name"
           },
-          "color": {
-            "type": "string",
-            "title": "Color"
+          "colors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Colors"
           },
           "owner": {
             "anyOf": [
@@ -1663,7 +1721,7 @@
           "id",
           "manufacturer",
           "name",
-          "color",
+          "colors",
           "is_clear",
           "input_date",
           "is_found",
@@ -1753,16 +1811,19 @@
             ],
             "title": "Name"
           },
-          "color": {
+          "colors": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Color"
+            "title": "Colors"
           },
           "owner_first_name": {
             "anyOf": [
@@ -1928,6 +1989,29 @@
           "name"
         ],
         "title": "OwnerOut"
+      },
+      "OwnerPhoneSuggestion": {
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "phone_number": {
+            "type": "string",
+            "title": "Phone Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "first_name",
+          "last_name",
+          "phone_number"
+        ],
+        "title": "OwnerPhoneSuggestion"
       },
       "PhoneNumberOut": {
         "properties": {
@@ -2271,16 +2355,19 @@
             ],
             "title": "Name"
           },
-          "color": {
+          "colors": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Color"
+            "title": "Colors"
           },
           "phone_number": {
             "type": "string",

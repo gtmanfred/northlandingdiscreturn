@@ -19,7 +19,7 @@ async def maybe_enqueue_heads_up(
         return False
     if owner.heads_up_sent_at is not None:
         return False
-    message = HEADS_UP_TEMPLATE.format(name=owner.name)
+    message = HEADS_UP_TEMPLATE.format(name=owner.name or "there")
     await PickupEventRepository(db).create_sms_job(
         phone_number=owner.phone_number, message=message
     )

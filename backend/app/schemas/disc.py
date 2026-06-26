@@ -25,7 +25,7 @@ class DiscOut(BaseModel):
     id: uuid.UUID
     manufacturer: str
     name: str
-    color: str
+    colors: list[str]
     owner: OwnerOut | None = None
     is_clear: bool
     input_date: date
@@ -40,10 +40,17 @@ class DiscOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _clean_colors(v: list[str] | None) -> list[str] | None:
+    """Trim each tag and drop empties, preserving order."""
+    if v is None:
+        return None
+    return [c.strip() for c in v if c and c.strip()]
+
+
 class DiscCreate(BaseModel):
     manufacturer: str
     name: str
-    color: str
+    colors: list[str]
     input_date: date
     owner_first_name: str | None = None
     owner_last_name: str | None = None
@@ -56,6 +63,14 @@ class DiscCreate(BaseModel):
     @classmethod
     def normalize(cls, v: str | None) -> str | None:
         return normalize_phone(v) if v else None
+
+    @field_validator("colors")
+    @classmethod
+    def clean_colors(cls, v: list[str]) -> list[str]:
+        cleaned = _clean_colors(v) or []
+        if not cleaned:
+            raise ValueError("at least one color is required")
+        return cleaned
 
     @model_validator(mode="after")
     def owner_fields_together(self) -> "DiscCreate":
@@ -77,7 +92,7 @@ class DiscCreate(BaseModel):
 class DiscUpdate(BaseModel):
     manufacturer: str | None = None
     name: str | None = None
-    color: str | None = None
+    colors: list[str] | None = None
     owner_first_name: str | None = None
     owner_last_name: str | None = None
     phone_number: str | None = None
@@ -91,11 +106,19 @@ class DiscUpdate(BaseModel):
     def normalize(cls, v: str | None) -> str | None:
         return normalize_phone(v) if v else None
 
+    @field_validator("colors")
+    @classmethod
+    def clean_colors(cls, v: list[str] | None) -> list[str] | None:
+        cleaned = _clean_colors(v)
+        if cleaned is not None and not cleaned:
+            raise ValueError("at least one color is required")
+        return cleaned
+
 
 class WishlistDiscCreate(BaseModel):
     manufacturer: str | None = None
     name: str | None = None
-    color: str | None = None
+    colors: list[str] | None = None
     phone_number: str
     owner_first_name: str | None = None
     owner_last_name: str | None = None
@@ -105,6 +128,11 @@ class WishlistDiscCreate(BaseModel):
     @classmethod
     def normalize(cls, v: str) -> str:
         return normalize_phone(v)
+
+    @field_validator("colors")
+    @classmethod
+    def clean_colors(cls, v: list[str] | None) -> list[str] | None:
+        return _clean_colors(v)
 
 
 class DiscPage(BaseModel):

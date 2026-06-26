@@ -10,6 +10,7 @@ import {
   getGetMyWishlistQueryKey,
 } from '../api/northlanding'
 import { AutocompleteInput } from '../components/AutocompleteInput'
+import { ColorTagInput } from '../components/ColorTagInput'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
@@ -31,7 +32,7 @@ export function MyWishlistPage() {
 
   const verifiedNumbers = user?.phone_numbers?.filter((p) => p.verified) ?? []
 
-  const [form, setForm] = useState({ manufacturer: '', name: '', color: '', notes: '' })
+  const [form, setForm] = useState<{ manufacturer: string; name: string; colors: string[]; notes: string }>({ manufacturer: '', name: '', colors: [], notes: '' })
   const [selectedPhone, setSelectedPhone] = useState<string>('')
 
   const phoneNumber = selectedPhone || verifiedNumbers[0]?.number || ''
@@ -43,7 +44,7 @@ export function MyWishlistPage() {
       data: {
         manufacturer: form.manufacturer,
         name: form.name,
-        color: form.color,
+        colors: form.colors,
         phone_number: phoneNumber,
         owner_first_name: first_name,
         owner_last_name: last_name,
@@ -51,7 +52,7 @@ export function MyWishlistPage() {
       },
     })
     queryClient.invalidateQueries({ queryKey: getGetMyWishlistQueryKey() })
-    setForm({ manufacturer: '', name: '', color: '', notes: '' })
+    setForm({ manufacturer: '', name: '', colors: [], notes: '' })
   }
 
   const handleRemove = async (discId: string) => {
@@ -97,13 +98,12 @@ export function MyWishlistPage() {
                 suggestions={nameSuggestions.map((v) => ({ value: v }))}
                 onValueChange={(v) => setForm((f) => ({ ...f, name: v }))}
               />
-              <AutocompleteInput
-                containerClassName="flex-1 min-w-24"
-                className={inputCls}
+              <ColorTagInput
+                className={`${inputCls} flex flex-1 min-w-24 flex-wrap items-center gap-1.5`}
                 placeholder="Color"
-                value={form.color}
-                suggestions={colorSuggestions.map((v) => ({ value: v }))}
-                onValueChange={(v) => setForm((f) => ({ ...f, color: v }))}
+                value={form.colors}
+                suggestions={colorSuggestions}
+                onChange={(colors) => setForm((f) => ({ ...f, colors }))}
               />
               <input
                 type="text"
@@ -151,8 +151,8 @@ export function MyWishlistPage() {
                     {disc.manufacturer && (
                       <span className="ml-2 text-sm text-muted-foreground">{disc.manufacturer}</span>
                     )}
-                    {disc.color && (
-                      <span className="ml-2 text-sm text-muted-foreground">· {disc.color}</span>
+                    {disc.colors.length > 0 && (
+                      <span className="ml-2 text-sm text-muted-foreground">· {disc.colors.join(', ')}</span>
                     )}
                     {disc.notes && (
                       <span className="ml-2 text-sm text-muted-foreground italic">· {disc.notes}</span>

@@ -58,7 +58,7 @@ export type DiscCreateNotes = string | null;
 export interface DiscCreate {
   manufacturer: string;
   name: string;
-  color: string;
+  colors: string[];
   input_date: string;
   owner_first_name?: DiscCreateOwnerFirstName;
   owner_last_name?: DiscCreateOwnerLastName;
@@ -76,7 +76,7 @@ export interface DiscOut {
   id: string;
   manufacturer: string;
   name: string;
-  color: string;
+  colors: string[];
   owner?: DiscOutOwner;
   is_clear: boolean;
   input_date: string;
@@ -106,7 +106,7 @@ export type DiscUpdateManufacturer = string | null;
 
 export type DiscUpdateName = string | null;
 
-export type DiscUpdateColor = string | null;
+export type DiscUpdateColors = string[] | null;
 
 export type DiscUpdateOwnerFirstName = string | null;
 
@@ -125,7 +125,7 @@ export type DiscUpdateIsReturned = boolean | null;
 export interface DiscUpdate {
   manufacturer?: DiscUpdateManufacturer;
   name?: DiscUpdateName;
-  color?: DiscUpdateColor;
+  colors?: DiscUpdateColors;
   owner_first_name?: DiscUpdateOwnerFirstName;
   owner_last_name?: DiscUpdateOwnerLastName;
   phone_number?: DiscUpdatePhoneNumber;
@@ -154,6 +154,12 @@ export interface OwnerOut {
   heads_up_sent_at?: OwnerOutHeadsUpSentAt;
   created_at: string;
   readonly name: string;
+}
+
+export interface OwnerPhoneSuggestion {
+  first_name: string;
+  last_name: string;
+  phone_number: string;
 }
 
 export type PhoneNumberOutVerifiedAt = string | null;
@@ -243,7 +249,7 @@ export type WishlistDiscCreateManufacturer = string | null;
 
 export type WishlistDiscCreateName = string | null;
 
-export type WishlistDiscCreateColor = string | null;
+export type WishlistDiscCreateColors = string[] | null;
 
 export type WishlistDiscCreateOwnerFirstName = string | null;
 
@@ -254,7 +260,7 @@ export type WishlistDiscCreateNotes = string | null;
 export interface WishlistDiscCreate {
   manufacturer?: WishlistDiscCreateManufacturer;
   name?: WishlistDiscCreateName;
-  color?: WishlistDiscCreateColor;
+  colors?: WishlistDiscCreateColors;
   phone_number: string;
   owner_first_name?: WishlistDiscCreateOwnerFirstName;
   owner_last_name?: WishlistDiscCreateOwnerLastName;
@@ -288,6 +294,10 @@ export const GetSuggestionsField = {
 export type GetPhoneSuggestionsParams = {
 owner_first_name?: string;
 owner_last_name?: string;
+};
+
+export type GetOwnersByPhoneParams = {
+digits?: string;
 };
 
 /**
@@ -2666,6 +2676,99 @@ export function useGetPhoneSuggestions<TData = Awaited<ReturnType<typeof getPhon
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetPhoneSuggestionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Get Owners By Phone
+ */
+export const getOwnersByPhone = (
+    params?: GetOwnersByPhoneParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<OwnerPhoneSuggestion[]>(
+      {url: `/suggestions/owners-by-phone`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getGetOwnersByPhoneQueryKey = (params?: GetOwnersByPhoneParams,) => {
+    return [
+    `/suggestions/owners-by-phone`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetOwnersByPhoneQueryOptions = <TData = Awaited<ReturnType<typeof getOwnersByPhone>>, TError = ErrorType<HTTPValidationError>>(params?: GetOwnersByPhoneParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnersByPhone>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnersByPhoneQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnersByPhone>>> = ({ signal }) => getOwnersByPhone(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnersByPhone>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnersByPhoneQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnersByPhone>>>
+export type GetOwnersByPhoneQueryError = ErrorType<HTTPValidationError>
+
+
+export function useGetOwnersByPhone<TData = Awaited<ReturnType<typeof getOwnersByPhone>>, TError = ErrorType<HTTPValidationError>>(
+ params: undefined |  GetOwnersByPhoneParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnersByPhone>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnersByPhone>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnersByPhone>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnersByPhone<TData = Awaited<ReturnType<typeof getOwnersByPhone>>, TError = ErrorType<HTTPValidationError>>(
+ params?: GetOwnersByPhoneParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnersByPhone>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnersByPhone>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnersByPhone>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnersByPhone<TData = Awaited<ReturnType<typeof getOwnersByPhone>>, TError = ErrorType<HTTPValidationError>>(
+ params?: GetOwnersByPhoneParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnersByPhone>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Owners By Phone
+ */
+
+export function useGetOwnersByPhone<TData = Awaited<ReturnType<typeof getOwnersByPhone>>, TError = ErrorType<HTTPValidationError>>(
+ params?: GetOwnersByPhoneParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnersByPhone>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnersByPhoneQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

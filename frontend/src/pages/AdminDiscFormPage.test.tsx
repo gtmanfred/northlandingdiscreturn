@@ -10,6 +10,7 @@ vi.mock('../api/northlanding', () => ({
   useListDiscs: () => ({ data: undefined, isLoading: false }),
   useGetSuggestions: () => ({ data: [] }),
   useGetPhoneSuggestions: () => ({ data: [] }),
+  useGetOwnersByPhone: () => ({ data: [] }),
   getListDiscsQueryKey: () => ['listDiscs'],
   getGetSuggestionsQueryKey: () => ['getSuggestions'],
 }))

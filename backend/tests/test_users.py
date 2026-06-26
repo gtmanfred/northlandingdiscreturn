@@ -160,7 +160,7 @@ async def test_get_my_wishlist(client, db):
     owner = await OwnerRepository(db).resolve_or_create(first_name="Wish", last_name="", phone_number="+15550001234")
     disc_repo = DiscRepository(db)
     await disc_repo.create(
-        manufacturer="Innova", name="Teebird", color="Pink",
+        manufacturer="Innova", name="Teebird", colors=["Pink"],
         input_date=date.today(), owner_id=owner.id, is_found=False
     )
     await db.commit()
@@ -180,7 +180,7 @@ async def test_add_wishlist_disc(client, db):
 
     resp = await client.post(
         "/users/me/wishlist",
-        json={"manufacturer": "Discraft", "name": "Buzzz", "color": "White",
+        json={"manufacturer": "Discraft", "name": "Buzzz", "colors": ["White"],
               "phone_number": "+15559990001"},
         headers=auth_headers(user.id),
     )
@@ -205,7 +205,7 @@ async def test_wishlist_add_resolves_owner_no_heads_up(client, db):
         "/users/me/wishlist",
         headers=auth_headers(user.id),
         json={"phone_number": "+15551112222", "manufacturer": "Innova",
-              "name": "Leopard", "color": "blue"},
+              "name": "Leopard", "colors": ["blue"]},
     )
     assert resp.status_code == 201
     assert resp.json()["owner"]["phone_number"] == "+15551112222"
@@ -233,7 +233,7 @@ async def test_wishlist_disc_persists_notes(client, db):
         json={
             "manufacturer": "Innova",
             "name": "Teebird",
-            "color": "Blue",
+            "colors": ["Blue"],
             "phone_number": "+15558880001",
             "notes": "blue marker on rim",
         },
@@ -273,7 +273,7 @@ async def test_me_discs_strips_notes(client, db):
         json={
             "manufacturer": "Discraft",
             "name": "Buzzz",
-            "color": "White",
+            "colors": ["White"],
             "input_date": str(date.today()),
             "owner_first_name": "NoteOwner",
             "owner_last_name": "",

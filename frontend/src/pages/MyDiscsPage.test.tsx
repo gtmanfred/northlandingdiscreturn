@@ -27,7 +27,7 @@ describe('MyDiscsPage', () => {
   it('shows disc details when data loads', () => {
     vi.mocked(useGetMyDiscs).mockReturnValue({
       isLoading: false,
-      data: [{ id: '1', manufacturer: 'Innova', name: 'Destroyer', color: 'Red', is_returned: false, photos: [] }],
+      data: [{ id: '1', manufacturer: 'Innova', name: 'Destroyer', colors: ['Red'], is_returned: false, photos: [] }],
     } as any)
     render(<MyDiscsPage />, { wrapper })
     expect(screen.getByText('Destroyer')).toBeInTheDocument()

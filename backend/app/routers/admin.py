@@ -88,7 +88,7 @@ async def add_user_wishlist(
     disc = await disc_repo.create(
         manufacturer=body.manufacturer or "Unknown",
         name=body.name or "Unknown",
-        color=body.color or "Unknown",
+        colors=body.colors or ["Unknown"],
         input_date=date.today(),
         phone_number=phone_number,
         is_found=False,
