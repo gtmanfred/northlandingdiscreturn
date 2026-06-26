@@ -462,6 +462,173 @@ async def test_heads_up_includes_disc_details(db, client):
     assert "https://discreturn.nl" in heads_up[0].message
 
 
+async def test_owner_allows_null_phone(db):
+    from app.models.owner import Owner
+    owner = Owner(first_name="No", last_name="Phone", phone_number=None)
+    db.add(owner)
+    await db.flush()
+    await db.refresh(owner)
+    assert owner.phone_number is None
+
+
+async def test_disc_has_returned_date_default_none(db):
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Roc", colors=["Red"], input_date=date.today()
+    )
+    assert disc.returned_date is None
+
+
+async def test_heads_up_skipped_when_no_phone(db):
+    from app.models.owner import Owner
+    from app.services.heads_up import maybe_enqueue_heads_up
+    owner = Owner(first_name="No", last_name="Phone", phone_number=None)
+    db.add(owner)
+    await db.flush()
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Wraith", colors=["Blue"],
+        input_date=date.today(), owner_id=owner.id,
+    )
+    disc.owner = owner
+    enqueued = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
+    assert enqueued is False
+
+
+async def test_returned_date_stamped_and_cleared(db, client):
+    admin = await make_admin(db, name="AdminRD", email="adminrd@example.com", google_id="g-adminrd")
+    headers = admin_headers(admin.id)
+
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Teebird", colors=["White"], input_date=date.today()
+    )
+    await db.flush()
+
+    r = await client.patch(f"/discs/{disc.id}", json={"is_returned": True}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["returned_date"] == date.today().isoformat()
+
+    r = await client.patch(f"/discs/{disc.id}", json={"is_returned": False}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["returned_date"] is None
+
+
+async def test_list_for_export_ignores_pagination(db):
+    repo = DiscRepository(db)
+    for i in range(3):
+        await repo.create(
+            manufacturer="Innova", name=f"D{i}", colors=["Red"], input_date=date.today()
+        )
+    await db.flush()
+    rows = await repo.list_for_export(is_found=None, is_returned=None, owner_name=None)
+    assert len(rows) == 3
+
+
+async def test_last_contact_dates(db):
+    from app.models.pickup_event import PickupEvent, DiscPickupNotification
+    from datetime import datetime, timezone
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Aviar", colors=["Red"], input_date=date.today()
+    )
+    event = PickupEvent(
+        start_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        end_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+    db.add(event)
+    await db.flush()
+    n = DiscPickupNotification(
+        disc_id=disc.id, pickup_event_id=event.id,
+        sent_at=datetime(2026, 6, 2, tzinfo=timezone.utc),
+    )
+    db.add(n)
+    await db.flush()
+    result = await repo.last_contact_dates([disc.id])
+    assert result[disc.id] == datetime(2026, 6, 2, tzinfo=timezone.utc)
+
+
+async def test_export_xlsx_admin_only(db, client):
+    from app.repositories.owner import OwnerRepository
+    admin = await make_admin(db, name="ExportAdmin", email="exp@x.com", google_id="g-exp")
+
+    owner = await OwnerRepository(db).resolve_or_create(
+        first_name="Jane", last_name="Doe", phone_number="+15551234567"
+    )
+    await db.flush()
+    repo = DiscRepository(db)
+    await repo.create(
+        manufacturer="Innova", name="Teebird", colors=["white"],
+        input_date=date(2026, 6, 1), owner_id=owner.id, notes="no prev",
+    )
+    await db.flush()
+
+    r = await client.get("/discs/export", headers=admin_headers(admin.id))
+    assert r.status_code == 200
+    assert "spreadsheetml" in r.headers["content-type"]
+
+    import io, openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(r.content))
+    grid = list(wb.active.iter_rows(values_only=True))
+    header = grid[1]
+    body = dict(zip(header, grid[2]))
+    assert body["Mfr"] == "Innova"
+    assert body["Name"] == "Jane Doe"
+    assert body["Color"] == "white"
+    assert body["Other"] == "no prev"
+
+
+async def test_export_forbidden_for_non_admin(db, client):
+    user = await UserRepository(db).create(name="Plain", email="plain@x.com", google_id="g-plain")
+    await db.flush()
+    r = await client.get("/discs/export", headers=admin_headers(user.id))
+    assert r.status_code == 403
+
+
+async def test_import_endpoint(db, client):
+    import io, openpyxl
+    from datetime import date as _date
+
+    admin = await make_admin(db, name="ImpAdmin", email="imp@x.com", google_id="g-imp")
+    headers = admin_headers(admin.id)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Current"
+    ws.append(["North Landing Discs Database"])
+    ws.append(["sorted"])
+    ws.append(["Name", "Phone", "Mfr", "Model", "Color", "Other",
+               "Code", "Date found", "Date retuned", "Date contacted"])
+    ws.append(["Jane Doe", "404-951-8881", "Innova", "Teebird", "white",
+               "x", None, _date(2026, 6, 1), None, None])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    files = {"file": ("sheet.xlsx", buf.getvalue(),
+                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = await client.post("/discs/import", files=files, headers=headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["created"] == 1
+    assert body["updated"] == 0
+
+
+async def test_import_rejects_missing_current_sheet(db, client):
+    import io, openpyxl
+
+    admin = await make_admin(db, name="ImpAdmin2", email="imp2@x.com", google_id="g-imp2")
+    headers = admin_headers(admin.id)
+
+    wb = openpyxl.Workbook()
+    wb.active.title = "Other"
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    files = {"file": ("sheet.xlsx", buf.getvalue(), "application/octet-stream")}
+    r = await client.post("/discs/import", files=files, headers=headers)
+    assert r.status_code == 422
+
+
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository

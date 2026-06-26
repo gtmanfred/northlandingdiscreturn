@@ -31,6 +31,7 @@ class DiscOut(BaseModel):
     input_date: date
     is_found: bool
     is_returned: bool
+    returned_date: date | None = None
     final_notice_sent: bool
     notes: str | None = None
     photos: list[DiscPhotoOut] = []

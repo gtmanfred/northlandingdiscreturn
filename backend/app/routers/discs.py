@@ -1,8 +1,10 @@
 # backend/app/routers/discs.py
 import asyncio
 import uuid
+from datetime import date
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user, require_admin
@@ -15,6 +17,8 @@ from app.services.heads_up import maybe_enqueue_heads_up
 from app.services.welcome import maybe_enqueue_welcome
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
+from app.services.disc_export import build_current_sheet_workbook
+from app.services.disc_import import parse_current_sheet, import_rows
 
 router = APIRouter()
 
@@ -98,6 +102,76 @@ async def create_disc(
     return await repo.get_by_id(disc.id)
 
 
+@router.get("/export", operation_id="exportDiscs")
+async def export_discs(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    is_found: bool | None = Query(default=None),
+    is_returned: bool | None = Query(default=None),
+    owner_name: str | None = Query(default=None),
+):
+    repo = DiscRepository(db)
+    discs = await repo.list_for_export(
+        is_found=is_found, is_returned=is_returned, owner_name=owner_name
+    )
+    contact = await repo.last_contact_dates([d.id for d in discs])
+
+    rows = []
+    for d in discs:
+        owner = d.owner
+        contacted = None
+        candidates = []
+        if owner and owner.heads_up_sent_at:
+            candidates.append(owner.heads_up_sent_at)
+        if d.id in contact and contact[d.id]:
+            candidates.append(contact[d.id])
+        if candidates:
+            contacted = max(candidates).date()
+        rows.append({
+            "Name": owner.name if owner else "?",
+            "Phone": owner.phone_number if owner and owner.phone_number else "",
+            "Mfr": d.manufacturer,
+            "Model": d.name,
+            "Color": " ".join(d.colors),
+            "Other": d.notes or "",
+            "Code": "R" if d.is_returned else "",
+            "Date found": d.input_date,
+            "Date returned": d.returned_date,
+            "Date contacted": contacted,
+        })
+
+    data = build_current_sheet_workbook(rows)
+    today = date.today().isoformat()
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="north-landing-discs-{today}.xlsx"'
+        },
+    )
+
+
+@router.post("/import", operation_id="importDiscs")
+async def import_discs(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...),
+):
+    content = await file.read()
+    try:
+        rows = parse_current_sheet(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    summary = await import_rows(rows, db)
+    await db.commit()
+    return {
+        "created": summary.created,
+        "updated": summary.updated,
+        "skipped": summary.skipped,
+        "errors": summary.errors,
+    }
+
+
 @router.patch("/{disc_id}", response_model=DiscOut, operation_id="updateDisc")
 async def update_disc(
     disc_id: uuid.UUID,
@@ -133,6 +207,12 @@ async def update_disc(
             payload["owner_id"] = new_owner.id
         else:
             payload["owner_id"] = None
+
+    if "is_returned" in fields_set:
+        if body.is_returned and not disc.is_returned:
+            payload["returned_date"] = date.today()
+        elif body.is_returned is False and disc.is_returned:
+            payload["returned_date"] = None
 
     if not payload:
         raise HTTPException(status_code=422, detail="No fields provided for update")

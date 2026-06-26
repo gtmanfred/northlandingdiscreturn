@@ -8,6 +8,7 @@ import {
   useUpdateDisc,
   getListDiscsQueryKey,
 } from '../api/northlanding'
+import { axiosInstance } from '@/api/client'
 import { PageHeader } from '../components/PageHeader'
 import { LoadingState } from '../components/LoadingState'
 import { EmptyState } from '../components/EmptyState'
@@ -71,6 +72,7 @@ export function AdminDiscsPage() {
   const deleteMutation = useDeleteDisc()
   const updateMutation = useUpdateDisc()
   const [error, setError] = useState('')
+  const [importMsg, setImportMsg] = useState('')
 
   const setTri = (setter: (v: boolean | undefined) => void) => (val: Tri) => {
     setter(val === 'all' ? undefined : val === 'true')
@@ -106,6 +108,44 @@ export function AdminDiscsPage() {
     }
   }
 
+  const handleDownloadSpreadsheet = async () => {
+    try {
+      const res = await axiosInstance.get('/discs/export', {
+        params: {
+          is_found: isFoundFilter,
+          is_returned: isReturnedFilter,
+          owner_name: ownerNameFilter,
+        },
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(res.data as Blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `north-landing-discs-${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      setError('Failed to download spreadsheet.')
+    }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const form = new FormData()
+    form.append('file', file)
+    try {
+      const res = await axiosInstance.post('/discs/import', form)
+      const s = res.data as { created: number; updated: number; skipped: number; errors: unknown[] }
+      setImportMsg(`Imported: ${s.created} new, ${s.updated} updated, ${s.skipped} unchanged, ${s.errors.length} errors`)
+      await queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+    } catch {
+      setImportMsg('Import failed. Check the file and try again.')
+    } finally {
+      e.target.value = ''
+    }
+  }
+
   const discs = data?.items ?? []
   const totalPages = data ? Math.ceil(data.total / pageSize) : 1
 
@@ -124,12 +164,24 @@ export function AdminDiscsPage() {
       <PageHeader
         title="Discs"
         actions={
-          <Button asChild>
-            <Link to="/admin/discs/new">
-              <Plus className="mr-1 h-4 w-4" />
-              Add Disc
-            </Link>
-          </Button>
+          <>
+            <Button variant="outline" onClick={handleDownloadSpreadsheet}>
+              Download spreadsheet
+            </Button>
+            <Button variant="outline" asChild>
+              <label>
+                Import spreadsheet
+                <input type="file" accept=".xlsx" className="hidden" onChange={handleImportFile} />
+              </label>
+            </Button>
+            {importMsg && <p className="text-sm text-muted-foreground">{importMsg}</p>}
+            <Button asChild>
+              <Link to="/admin/discs/new">
+                <Plus className="mr-1 h-4 w-4" />
+                Add Disc
+              </Link>
+            </Button>
+          </>
         }
       />
 
