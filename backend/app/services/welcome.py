@@ -16,6 +16,8 @@ async def maybe_enqueue_welcome(*, owner: Owner, db: AsyncSession) -> bool:
     """Enqueue the one-time welcome SMS to this owner. Returns True if enqueued."""
     if owner.welcome_sent_at is not None:
         return False
+    if not owner.phone_number:
+        return False
     message = WELCOME_TEMPLATE.format(name=owner.name)
     await PickupEventRepository(db).create_sms_job(
         phone_number=owner.phone_number, message=message

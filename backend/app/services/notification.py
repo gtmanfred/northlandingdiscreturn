@@ -23,7 +23,7 @@ async def enqueue_pickup_notifications(
     owner_is_final: dict = defaultdict(bool)
 
     for disc in unreturned:
-        if disc.owner is None:
+        if disc.owner is None or not disc.owner.phone_number:
             continue
         if await event_repo.disc_already_notified_for_event(disc.id, event.id):
             continue

@@ -116,6 +116,17 @@ async def test_repo_mark_heads_up_sent(db):
 from app.schemas.disc import DiscOut
 
 
+async def test_resolve_or_create_null_phone(db):
+    from app.repositories.owner import OwnerRepository
+    repo = OwnerRepository(db)
+    owner = await repo.resolve_or_create(first_name="No", last_name="Phone", phone_number=None)
+    assert owner.id is not None
+    assert owner.phone_number is None
+    # second call with same null-phone identity returns the same row
+    again = await repo.resolve_or_create(first_name="No", last_name="Phone", phone_number=None)
+    assert again.id == owner.id
+
+
 async def test_disc_out_embeds_owner(db):
     from app.repositories.owner import OwnerRepository
     from app.repositories.disc import DiscRepository

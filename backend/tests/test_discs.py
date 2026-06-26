@@ -479,6 +479,22 @@ async def test_disc_has_returned_date_default_none(db):
     assert disc.returned_date is None
 
 
+async def test_heads_up_skipped_when_no_phone(db):
+    from app.models.owner import Owner
+    from app.services.heads_up import maybe_enqueue_heads_up
+    owner = Owner(first_name="No", last_name="Phone", phone_number=None)
+    db.add(owner)
+    await db.flush()
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova", name="Wraith", colors=["Blue"],
+        input_date=date.today(), owner_id=owner.id,
+    )
+    disc.owner = owner
+    enqueued = await maybe_enqueue_heads_up(owner=owner, disc=disc, db=db)
+    assert enqueued is False
+
+
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository
