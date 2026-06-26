@@ -43,6 +43,10 @@ export interface ApiKeyMeta {
   last_used_at?: ApiKeyMetaLastUsedAt;
 }
 
+export interface BodyImportDiscs {
+  file: Blob;
+}
+
 export interface BodyUploadDiscPhoto {
   file: Blob;
 }
@@ -70,6 +74,8 @@ export interface DiscCreate {
 
 export type DiscOutOwner = OwnerOut | null;
 
+export type DiscOutReturnedDate = string | null;
+
 export type DiscOutNotes = string | null;
 
 export interface DiscOut {
@@ -82,6 +88,7 @@ export interface DiscOut {
   input_date: string;
   is_found: boolean;
   is_returned: boolean;
+  returned_date?: DiscOutReturnedDate;
   final_notice_sent: boolean;
   notes?: DiscOutNotes;
   photos?: DiscPhotoOut[];
@@ -270,6 +277,12 @@ export interface WishlistDiscCreate {
 export type ListDiscsParams = {
 page?: number;
 page_size?: number;
+is_found?: boolean | null;
+is_returned?: boolean | null;
+owner_name?: string | null;
+};
+
+export type ExportDiscsParams = {
 is_found?: boolean | null;
 is_returned?: boolean | null;
 owner_name?: string | null;
@@ -764,6 +777,166 @@ export const useCreateDisc = <TError = ErrorType<HTTPValidationError>,
       > => {
 
       const mutationOptions = getCreateDiscMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * @summary Export Discs
+ */
+export const exportDiscs = (
+    params?: ExportDiscsParams,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<unknown>(
+      {url: `/discs/export`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+  
+
+
+
+export const getExportDiscsQueryKey = (params?: ExportDiscsParams,) => {
+    return [
+    `/discs/export`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getExportDiscsQueryOptions = <TData = Awaited<ReturnType<typeof exportDiscs>>, TError = ErrorType<HTTPValidationError>>(params?: ExportDiscsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportDiscs>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportDiscsQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportDiscs>>> = ({ signal }) => exportDiscs(params, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportDiscs>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ExportDiscsQueryResult = NonNullable<Awaited<ReturnType<typeof exportDiscs>>>
+export type ExportDiscsQueryError = ErrorType<HTTPValidationError>
+
+
+export function useExportDiscs<TData = Awaited<ReturnType<typeof exportDiscs>>, TError = ErrorType<HTTPValidationError>>(
+ params: undefined |  ExportDiscsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportDiscs>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportDiscs>>,
+          TError,
+          Awaited<ReturnType<typeof exportDiscs>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportDiscs<TData = Awaited<ReturnType<typeof exportDiscs>>, TError = ErrorType<HTTPValidationError>>(
+ params?: ExportDiscsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportDiscs>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportDiscs>>,
+          TError,
+          Awaited<ReturnType<typeof exportDiscs>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportDiscs<TData = Awaited<ReturnType<typeof exportDiscs>>, TError = ErrorType<HTTPValidationError>>(
+ params?: ExportDiscsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportDiscs>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Export Discs
+ */
+
+export function useExportDiscs<TData = Awaited<ReturnType<typeof exportDiscs>>, TError = ErrorType<HTTPValidationError>>(
+ params?: ExportDiscsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportDiscs>>, TError, TData>>, }
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getExportDiscsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+/**
+ * @summary Import Discs
+ */
+export const importDiscs = (
+    bodyImportDiscs: BodyImportDiscs,
+ signal?: AbortSignal
+) => {
+      
+      const formData = new FormData();
+formData.append(`file`, bodyImportDiscs.file)
+
+      return customInstance<unknown>(
+      {url: `/discs/import`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData, signal
+    },
+      );
+    }
+  
+
+
+export const getImportDiscsMutationOptions = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importDiscs>>, TError,{data: BodyImportDiscs}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof importDiscs>>, TError,{data: BodyImportDiscs}, TContext> => {
+
+const mutationKey = ['importDiscs'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importDiscs>>, {data: BodyImportDiscs}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importDiscs(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportDiscsMutationResult = NonNullable<Awaited<ReturnType<typeof importDiscs>>>
+    export type ImportDiscsMutationBody = BodyImportDiscs
+    export type ImportDiscsMutationError = ErrorType<HTTPValidationError>
+
+    /**
+ * @summary Import Discs
+ */
+export const useImportDiscs = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importDiscs>>, TError,{data: BodyImportDiscs}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof importDiscs>>,
+        TError,
+        {data: BodyImportDiscs},
+        TContext
+      > => {
+
+      const mutationOptions = getImportDiscsMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

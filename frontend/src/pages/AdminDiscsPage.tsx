@@ -8,6 +8,7 @@ import {
   useUpdateDisc,
   getListDiscsQueryKey,
 } from '../api/northlanding'
+import { axiosInstance } from '@/api/client'
 import { PageHeader } from '../components/PageHeader'
 import { LoadingState } from '../components/LoadingState'
 import { EmptyState } from '../components/EmptyState'
@@ -106,6 +107,23 @@ export function AdminDiscsPage() {
     }
   }
 
+  const handleDownloadSpreadsheet = async () => {
+    const res = await axiosInstance.get('/discs/export', {
+      params: {
+        is_found: isFoundFilter,
+        is_returned: isReturnedFilter,
+        owner_name: ownerNameFilter,
+      },
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(res.data as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `north-landing-discs-${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
   const discs = data?.items ?? []
   const totalPages = data ? Math.ceil(data.total / pageSize) : 1
 
@@ -124,12 +142,17 @@ export function AdminDiscsPage() {
       <PageHeader
         title="Discs"
         actions={
-          <Button asChild>
-            <Link to="/admin/discs/new">
-              <Plus className="mr-1 h-4 w-4" />
-              Add Disc
-            </Link>
-          </Button>
+          <>
+            <Button variant="outline" onClick={handleDownloadSpreadsheet}>
+              Download spreadsheet
+            </Button>
+            <Button asChild>
+              <Link to="/admin/discs/new">
+                <Plus className="mr-1 h-4 w-4" />
+                Add Disc
+              </Link>
+            </Button>
+          </>
         }
       />
 
