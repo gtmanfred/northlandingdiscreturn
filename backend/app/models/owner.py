@@ -24,7 +24,7 @@ class Owner(Base):
     )
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False, default="")
-    phone_number: Mapped[str] = mapped_column(String, nullable=False)
+    phone_number: Mapped[str | None] = mapped_column(String, nullable=True)
     heads_up_sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

@@ -9,13 +9,14 @@ class OwnerRepository:
         self.db = db
 
     async def resolve_or_create(
-        self, *, first_name: str, last_name: str, phone_number: str
+        self, *, first_name: str, last_name: str, phone_number: str | None
     ) -> Owner:
         result = await self.db.execute(
             select(Owner).where(
                 Owner.first_name == first_name,
                 Owner.last_name == last_name,
-                Owner.phone_number == phone_number,
+                Owner.phone_number.is_(phone_number) if phone_number is None
+                else Owner.phone_number == phone_number,
             )
         )
         existing = result.scalar_one_or_none()
