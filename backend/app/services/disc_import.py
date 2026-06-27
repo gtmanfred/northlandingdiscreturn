@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.phone import normalize_phone
 from app.repositories.disc import DiscRepository
 from app.repositories.owner import OwnerRepository
+from app.services.welcome import maybe_enqueue_welcome
+from app.services.heads_up import maybe_enqueue_heads_up
 
 SHEET_NAME = "Current"
 HEADER_KEYWORD = "Name"
@@ -126,13 +128,14 @@ async def import_rows(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSumm
             continue
 
         owner_id = None
+        owner_obj = None
         if row.phone or row.first_name or row.last_name:
-            owner = await owner_repo.resolve_or_create(
+            owner_obj = await owner_repo.resolve_or_create(
                 first_name=row.first_name,
                 last_name=row.last_name,
                 phone_number=row.phone,
             )
-            owner_id = owner.id
+            owner_id = owner_obj.id
 
         existing = await disc_repo.find_by_import_key(
             input_date=row.input_date,
@@ -155,6 +158,10 @@ async def import_rows(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSumm
                 await disc_repo.update(
                     disc, is_returned=True, returned_date=row.returned_date
                 )
+            else:
+                if owner_obj is not None:
+                    await maybe_enqueue_welcome(owner=owner_obj, db=db)
+                    await maybe_enqueue_heads_up(owner=owner_obj, disc=disc, db=db)
             summary.created += 1
         else:
             updates = {}

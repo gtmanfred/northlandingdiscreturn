@@ -2,8 +2,10 @@ import io
 from datetime import date as _date
 import openpyxl
 import pytest
+from sqlalchemy import select
 from app.services.disc_import import parse_current_sheet, ParsedDiscRow, import_rows, ImportSummary
 from app.repositories.disc import DiscRepository
+from app.models.pickup_event import SMSJob
 
 
 def _make_sheet(data_rows):
@@ -178,3 +180,52 @@ async def test_import_create_branch_already_returned(db):
     disc = discs[0]
     assert disc.is_returned is True
     assert disc.returned_date == ret_date
+
+
+# --- Notification tests (TDD: RED first) ---
+
+@pytest.mark.asyncio
+async def test_import_create_enqueues_welcome_and_heads_up(db):
+    """Created disc with phone+name enqueues exactly one welcome and one heads-up SMSJob."""
+    await import_rows([_row()], db)
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 2
+
+
+@pytest.mark.asyncio
+async def test_import_two_creates_same_owner_one_welcome_two_heads_up(db):
+    """Two created discs, same owner in one call → welcome once, heads-up twice."""
+    row1 = _row(manufacturer="Innova", model="Teebird", colors=["white"])
+    row2 = _row(manufacturer="Discraft", model="Buzzz", colors=["red"],
+                row_number=5, input_date=_date(2026, 6, 2))
+    await import_rows([row1, row2], db)
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 3  # 1 welcome + 2 heads-up
+
+
+@pytest.mark.asyncio
+async def test_import_update_does_not_enqueue(db):
+    """A row that matches an existing disc (update branch) → no new SMSJob."""
+    await import_rows([_row()], db)
+    # consume the jobs from first import by clearing them
+    await db.execute(SMSJob.__table__.delete())
+    # re-import with changed notes → update, not create
+    await import_rows([_row(notes="changed")], db)
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 0
+
+
+@pytest.mark.asyncio
+async def test_import_created_returned_row_no_sms(db):
+    """Created row that is already returned from the sheet → no SMSJob enqueued."""
+    await import_rows([_row(returned=True, returned_date=_date(2026, 5, 20))], db)
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 0
+
+
+@pytest.mark.asyncio
+async def test_import_create_no_phone_no_sms(db):
+    """Created disc whose owner has a null phone → no SMSJob."""
+    await import_rows([_row(phone=None)], db)
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 0
