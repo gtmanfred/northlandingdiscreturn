@@ -39,6 +39,14 @@ Reuse the existing service functions — do not duplicate SMS logic.
   notify — a disc that is already returned should not trigger a "we found your disc" text.
 - **Updated / matched / skipped rows:** never notify.
 
+### Date contacted is intentionally ignored
+
+A created row whose sheet has `Date contacted` filled **still notifies** (welcome + heads-up).
+The import does not read the `Date contacted` column and does not suppress texts based on it.
+Decision made deliberately: import always notifies the discs it creates. Owners Roger already
+contacted out-of-band may therefore receive an app heads-up on the first import; this is
+accepted.
+
 ### Dedup
 
 - Welcome dedup is owner-level via `owner.welcome_sent_at` (the service guard). Two created
