@@ -4,9 +4,12 @@ import hashlib
 import json
 import time
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.database import get_db
+from app.repositories.sms_opt_out import SMSOptOutRepository
 
 router = APIRouter()
 
@@ -44,7 +47,7 @@ def validate_surge_signature(raw_body: bytes, header: str, secret: str) -> bool:
 
 
 @router.post("/sms", operation_id="surgeWebhook", include_in_schema=False)
-async def surge_inbound(request: Request):
+async def surge_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     raw = await request.body()
     signature = request.headers.get("Surge-Signature", "")
     if not validate_surge_signature(raw, signature, settings.SURGE_WEBHOOK_SIGNING_SECRET):
@@ -58,4 +61,12 @@ async def surge_inbound(request: Request):
     body = (data.get("body") or "").strip().upper()
     contact = (data.get("conversation") or {}).get("contact") or {}
     from_number = contact.get("phone_number", "")
+
+    if from_number:
+        opt_out_repo = SMSOptOutRepository(db)
+        if body == "STOP":
+            await opt_out_repo.opt_out(from_number)
+        elif body == "START":
+            await opt_out_repo.opt_in(from_number)
+
     return {"status": "received", "from": from_number, "body": body}

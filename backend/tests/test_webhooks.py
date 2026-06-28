@@ -5,6 +5,7 @@ import json
 import time
 
 from app.config import settings
+from app.repositories.sms_opt_out import SMSOptOutRepository
 
 
 def make_surge_signature(raw_body: bytes, secret: str, ts: int) -> str:
@@ -110,3 +111,54 @@ async def test_surge_webhook_rejects_when_signing_secret_unset(client, monkeypat
         headers={"Surge-Signature": sig, "Content-Type": "application/json"},
     )
     assert resp.status_code == 403
+
+
+async def _post_signed(client, raw: bytes):
+    ts = int(time.time())
+    sig = make_surge_signature(raw, settings.SURGE_WEBHOOK_SIGNING_SECRET, ts)
+    return await client.post(
+        "/webhooks/sms",
+        content=raw,
+        headers={"Surge-Signature": sig, "Content-Type": "application/json"},
+    )
+
+
+async def test_stop_creates_opt_out(client, db):
+    resp = await _post_signed(client, _payload(body="STOP", phone="+15551112222"))
+    assert resp.status_code == 200
+    assert await SMSOptOutRepository(db).is_opted_out("+15551112222") is True
+
+
+async def test_lowercase_stop_creates_opt_out(client, db):
+    resp = await _post_signed(client, _payload(body="stop", phone="+15551112222"))
+    assert resp.status_code == 200
+    assert await SMSOptOutRepository(db).is_opted_out("+15551112222") is True
+
+
+async def test_start_removes_opt_out(client, db):
+    await SMSOptOutRepository(db).opt_out("+15551112222")
+    resp = await _post_signed(client, _payload(body="START", phone="+15551112222"))
+    assert resp.status_code == 200
+    assert await SMSOptOutRepository(db).is_opted_out("+15551112222") is False
+
+
+async def test_duplicate_stop_is_idempotent(client, db):
+    await _post_signed(client, _payload(body="STOP", phone="+15551112222"))
+    await _post_signed(client, _payload(body="STOP", phone="+15551112222"))
+    assert await SMSOptOutRepository(db).is_opted_out("+15551112222") is True
+
+
+async def test_non_keyword_body_does_not_change_state(client, db):
+    resp = await _post_signed(client, _payload(body="hello there", phone="+15551112222"))
+    assert resp.status_code == 200
+    assert await SMSOptOutRepository(db).is_opted_out("+15551112222") is False
+
+
+async def test_empty_from_number_does_not_error(client, db):
+    raw = json.dumps({
+        "type": "message.received",
+        "id": "evt_test",
+        "data": {"body": "STOP", "conversation": {"contact": {"phone_number": ""}}},
+    }).encode()
+    resp = await _post_signed(client, raw)
+    assert resp.status_code == 200

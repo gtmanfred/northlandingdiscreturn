@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 from app.repositories.pickup_event import PickupEventRepository
+from app.repositories.sms_opt_out import SMSOptOutRepository
 from app.services.surge import send_sms_async
 
 logging.basicConfig(level=logging.INFO)
@@ -27,8 +28,13 @@ async def process_sms_jobs(db: AsyncSession | None = None) -> None:
         if not jobs:
             return
         logger.info(f"Processing {len(jobs)} SMS jobs")
+        opt_out_repo = SMSOptOutRepository(db)
         async with httpx.AsyncClient() as client:
             for job in jobs:
+                if await opt_out_repo.is_opted_out(job.phone_number):
+                    await repo.mark_sms_skipped(job)
+                    logger.info(f"SMS skipped (opted out): {job.phone_number}")
+                    continue
                 try:
                     await send_sms_async(client, job.phone_number, job.message)
                     await repo.mark_sms_sent(job)

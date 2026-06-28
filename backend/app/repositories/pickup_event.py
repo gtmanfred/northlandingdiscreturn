@@ -118,3 +118,10 @@ class PickupEventRepository:
         job.processed_at = datetime.now(timezone.utc)
         job.error = error
         await self.db.flush()
+
+    async def mark_sms_skipped(self, job: SMSJob) -> None:
+        # Skipped jobs are terminal: a job skipped because the recipient was opted out
+        # is NOT re-queued if they later reply START and opt back in.
+        job.status = SMSJobStatus.skipped
+        job.processed_at = datetime.now(timezone.utc)
+        await self.db.flush()
