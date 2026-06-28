@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sms_opt_out import SMSOptOut
 
@@ -17,9 +18,12 @@ class SMSOptOutRepository:
         return await self._get(phone_number) is not None
 
     async def opt_out(self, phone_number: str) -> None:
-        if await self._get(phone_number) is None:
-            self.db.add(SMSOptOut(phone_number=phone_number))
-            await self.db.flush()
+        await self.db.execute(
+            pg_insert(SMSOptOut)
+            .values(phone_number=phone_number)
+            .on_conflict_do_nothing(index_elements=["phone_number"])
+        )
+        await self.db.flush()
 
     async def opt_in(self, phone_number: str) -> None:
         existing = await self._get(phone_number)

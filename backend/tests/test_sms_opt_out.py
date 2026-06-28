@@ -1,4 +1,6 @@
 # backend/tests/test_sms_opt_out.py
+from sqlalchemy import select, func
+from app.models.sms_opt_out import SMSOptOut
 from app.repositories.sms_opt_out import SMSOptOutRepository
 
 
@@ -14,6 +16,10 @@ async def test_opt_out_is_idempotent(db):
     await repo.opt_out("+15551234567")
     await repo.opt_out("+15551234567")
     assert await repo.is_opted_out("+15551234567") is True
+    count = await db.execute(
+        select(func.count()).select_from(SMSOptOut).where(SMSOptOut.phone_number == "+15551234567")
+    )
+    assert count.scalar_one() == 1
 
 
 async def test_opt_in_removes_opt_out(db):

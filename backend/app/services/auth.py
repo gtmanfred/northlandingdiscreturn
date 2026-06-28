@@ -24,6 +24,8 @@ def create_refresh_token() -> str:
 
 
 def send_verification_sms(to_number: str, code: str) -> None:
+    # Intentionally exempt from the SMS opt-out list: phone-verification OTP is
+    # user-initiated transactional auth and is not subject to STOP opt-out (TCPA).
     send_sms_sync(
         to_number,
         f"Your North Landing disc return verification code is: {code}",
