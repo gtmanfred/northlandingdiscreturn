@@ -12,6 +12,7 @@ class SMSJobStatus(str, enum.Enum):
     processing = "processing"
     sent = "sent"
     failed = "failed"
+    skipped = "skipped"
 
 
 class PickupEvent(Base):

@@ -3,6 +3,7 @@ import httpx
 import pytest
 from app.repositories.pickup_event import PickupEventRepository
 from app.models.pickup_event import SMSJobStatus
+from app.repositories.sms_opt_out import SMSOptOutRepository
 from app.config import settings
 from worker import main as worker_main
 
@@ -67,3 +68,25 @@ async def test_process_sms_jobs_marks_failed_on_surge_error(db, monkeypatch):
     await db.refresh(job)
     assert job.status == SMSJobStatus.failed
     assert job.error  # populated from raise_for_status message
+
+
+async def test_process_sms_jobs_skips_opted_out(db, monkeypatch):
+    repo = PickupEventRepository(db)
+    await SMSOptOutRepository(db).opt_out("+15551234567")
+    job = await repo.create_sms_job(phone_number="+15551234567", message="Test notice")
+    await db.commit()
+
+    captured = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(str(request.url))
+        return httpx.Response(201, json={"id": "msg_test"})
+
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(httpx, "AsyncClient", _make_async_client_factory(transport))
+
+    await worker_main.process_sms_jobs(db)
+
+    assert captured == []  # no HTTP call made
+    await db.refresh(job)
+    assert job.status == SMSJobStatus.skipped

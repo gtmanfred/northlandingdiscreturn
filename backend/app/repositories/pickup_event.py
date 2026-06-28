@@ -118,3 +118,8 @@ class PickupEventRepository:
         job.processed_at = datetime.now(timezone.utc)
         job.error = error
         await self.db.flush()
+
+    async def mark_sms_skipped(self, job: SMSJob) -> None:
+        job.status = SMSJobStatus.skipped
+        job.processed_at = datetime.now(timezone.utc)
+        await self.db.flush()
