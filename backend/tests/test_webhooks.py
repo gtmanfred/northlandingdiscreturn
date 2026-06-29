@@ -162,3 +162,33 @@ async def test_empty_from_number_does_not_error(client, db):
     }).encode()
     resp = await _post_signed(client, raw)
     assert resp.status_code == 200
+
+
+async def test_stop_commits_the_transaction(client, db, monkeypatch):
+    # get_db does not commit on its own; the handler must commit or the opt-out
+    # is rolled back when the request session closes in production.
+    commits = []
+    original_commit = db.commit
+
+    async def spy_commit():
+        commits.append(True)
+        await original_commit()
+
+    monkeypatch.setattr(db, "commit", spy_commit)
+    resp = await _post_signed(client, _payload(body="STOP", phone="+15551113333"))
+    assert resp.status_code == 200
+    assert commits, "handler must commit so the opt-out persists past the request"
+
+
+async def test_start_commits_the_transaction(client, db, monkeypatch):
+    commits = []
+    original_commit = db.commit
+
+    async def spy_commit():
+        commits.append(True)
+        await original_commit()
+
+    monkeypatch.setattr(db, "commit", spy_commit)
+    resp = await _post_signed(client, _payload(body="START", phone="+15551113333"))
+    assert resp.status_code == 200
+    assert commits, "handler must commit so the opt-in persists past the request"
