@@ -62,11 +62,13 @@ async def surge_inbound(request: Request, db: AsyncSession = Depends(get_db)):
     contact = (data.get("conversation") or {}).get("contact") or {}
     from_number = contact.get("phone_number", "")
 
-    if from_number:
+    if from_number and body in ("STOP", "START"):
         opt_out_repo = SMSOptOutRepository(db)
         if body == "STOP":
             await opt_out_repo.opt_out(from_number)
-        elif body == "START":
+        else:
             await opt_out_repo.opt_in(from_number)
+        # get_db does not commit; persist the change before the session closes.
+        await db.commit()
 
     return {"status": "received", "from": from_number, "body": body}
