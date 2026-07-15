@@ -192,7 +192,9 @@ class DiscRepository:
             if [c.strip().lower() for c in disc.colors] != target_colors:
                 continue
             disc_phone = disc.owner.phone_number if disc.owner else None
-            if disc_phone != phone:
+            # A stored disc with no phone matches any incoming phone, so a
+            # later import can attach the phone instead of creating a duplicate.
+            if disc_phone is not None and disc_phone != phone:
                 continue
             return disc
         return None
