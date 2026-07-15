@@ -371,18 +371,18 @@
         }
       }
     },
-    "/discs/import": {
+    "/discs/import/preview": {
       "post": {
         "tags": [
           "discs"
         ],
-        "summary": "Import Discs",
-        "operationId": "importDiscs",
+        "summary": "Preview Import Discs",
+        "operationId": "previewImportDiscs",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_importDiscs"
+                "$ref": "#/components/schemas/Body_previewImportDiscs"
               }
             }
           },
@@ -413,6 +413,98 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/discs/import/{staging_id}/apply": {
+      "post": {
+        "tags": [
+          "discs"
+        ],
+        "summary": "Apply Import Discs",
+        "operationId": "applyImportDiscs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "staging_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Staging Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discs/import/{staging_id}/cancel": {
+      "post": {
+        "tags": [
+          "discs"
+        ],
+        "summary": "Cancel Import Discs",
+        "operationId": "cancelImportDiscs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "staging_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Staging Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/discs/{disc_id}": {
@@ -1661,7 +1753,7 @@
         ],
         "title": "ApiKeyMeta"
       },
-      "Body_importDiscs": {
+      "Body_previewImportDiscs": {
         "properties": {
           "file": {
             "type": "string",
@@ -1673,7 +1765,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_importDiscs"
+        "title": "Body_previewImportDiscs"
       },
       "Body_uploadDiscPhoto": {
         "properties": {
@@ -2107,7 +2199,14 @@
             "title": "Last Name"
           },
           "phone_number": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Phone Number"
           },
           "heads_up_sent_at": {
@@ -2138,7 +2237,6 @@
           "id",
           "first_name",
           "last_name",
-          "phone_number",
           "created_at",
           "name"
         ],

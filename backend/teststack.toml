@@ -1,12 +1,14 @@
 [tests]
 min_version = 'v0.16.0'
-mount = false
+mount = true
 
 [tests.steps]
 sync = "uv sync --extra dev"
+migrate = "uv run alembic {posargs}"
 tests = "uv run pytest {posargs}"
 
 [tests.environment]
+UV_PROJECT_ENVIRONMENT = "/opt/uvenv"
 SECRET_KEY = "test-secret-key-for-tests-only"
 API_KEY_HMAC_SECRET = "test-api-key-hmac-secret"
 GOOGLE_CLIENT_ID = "test-client-id"
