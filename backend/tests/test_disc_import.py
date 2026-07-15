@@ -229,3 +229,20 @@ async def test_import_create_no_phone_no_sms(db):
     await import_rows([_row(phone=None)], db)
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 0
+
+
+@pytest.mark.asyncio
+async def test_import_adds_phone_to_null_phone_disc_updates_not_creates(db):
+    """Disc imported without a phone, re-imported with a phone → same disc gets
+    the phone, no duplicate created."""
+    s1 = await import_rows([_row(phone=None)], db)
+    assert s1.created == 1
+
+    s2 = await import_rows([_row(phone="+15551234567")], db)
+    assert s2.created == 0 and s2.updated == 1
+
+    repo = DiscRepository(db)
+    rows = await repo.list_for_export()
+    assert len(rows) == 1
+    assert rows[0].owner is not None
+    assert rows[0].owner.phone_number == "+15551234567"
