@@ -265,6 +265,15 @@ def _plan_diffs(existing, row: ParsedDiscRow) -> list[dict]:
     return diffs
 
 
+def _notify_status(row: ParsedDiscRow) -> tuple[bool, str | None]:
+    """Whether apply would text this new disc's owner, and if not, why. Row-only."""
+    if row.returned:
+        return False, "returned"
+    if not row.phone:
+        return False, "no phone"
+    return True, None
+
+
 @dataclass
 class ImportPlan:
     created: list[dict] = field(default_factory=list)
@@ -283,6 +292,7 @@ class ImportPlan:
                 "updated": len(self.updated),
                 "unchanged": self.unchanged,
                 "errors": len(self.errors),
+                "will_notify": sum(1 for c in self.created if c["will_notify"]),
             },
         }
 
@@ -306,7 +316,10 @@ async def plan_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportPlan
         )
         label = {"row_number": row.row_number, **_disc_label(row)}
         if existing is None:
-            plan.created.append(label)
+            will_notify, skip_reason = _notify_status(row)
+            plan.created.append(
+                {**label, "will_notify": will_notify, "skip_reason": skip_reason}
+            )
         else:
             diffs = _plan_diffs(existing, row)
             if diffs:

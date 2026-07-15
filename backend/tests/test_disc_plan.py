@@ -85,3 +85,29 @@ async def test_plan_captures_error_rows_full_content(db):
     assert err["reason"] == "missing or invalid Date found"
     assert err["row"]["manufacturer"] == "Innova"
     assert err["row"]["model"] == "Teebird"
+
+
+async def test_plan_created_will_notify_when_phone_and_not_returned(db):
+    plan = await plan_import([_row(phone="+15551234567", returned=False)], db)
+    d = plan.to_dict()
+    item = d["created"][0]
+    assert item["will_notify"] is True
+    assert item["skip_reason"] is None
+    assert d["counts"]["will_notify"] == 1
+
+
+async def test_plan_created_returned_does_not_notify(db):
+    plan = await plan_import(
+        [_row(phone="+15551234567", returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    item = plan.to_dict()["created"][0]
+    assert item["will_notify"] is False
+    assert item["skip_reason"] == "returned"
+    assert plan.to_dict()["counts"]["will_notify"] == 0
+
+
+async def test_plan_created_no_phone_does_not_notify(db):
+    plan = await plan_import([_row(phone=None)], db)
+    item = plan.to_dict()["created"][0]
+    assert item["will_notify"] is False
+    assert item["skip_reason"] == "no phone"
