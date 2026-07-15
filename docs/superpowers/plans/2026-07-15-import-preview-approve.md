@@ -10,7 +10,11 @@
 
 ## Global Constraints
 
-- Backend tests run with PostgreSQL (JSONB, ARRAY, enums are used): `cd backend && uv run pytest <path> -v`.
+- Backend tests run in the teststack container against real PostgreSQL (JSONB, ARRAY, enums are used). Local edits are NOT live-mounted — copy them in first, then run:
+  ```
+  cd backend && docker cp app backend_tests:/srv/ && docker cp tests backend_tests:/srv/ && docker cp alembic backend_tests:/srv/ && teststack run -s tests -- tests/<file>.py -v
+  ```
+  (Do NOT `docker cp .` — it would clobber the container's Linux `.venv` with the local macOS one.)
 - `asyncio_mode = "auto"` — async test functions need no `@pytest.mark.asyncio` decorator (existing tests omit it).
 - Alembic current head is `e4f5a6b7c8d9`. New migration's `down_revision` MUST be `e4f5a6b7c8d9`.
 - New migration revision format follows `e4f5a6b7c8d9_...py` (`revision: str = '...'`, `down_revision: Union[str, Sequence[str], None] = '...'`).
@@ -472,8 +476,13 @@ def downgrade() -> None:
 
 - [ ] **Step 6: Verify migration applies (upgrade then downgrade)**
 
-Run: `cd backend && uv run alembic upgrade head && uv run alembic downgrade -1 && uv run alembic upgrade head`
-Expected: no errors; `import_staging` table created, dropped, recreated.
+Run (copy migration in, reset the test DB to pristine, then cycle):
+```
+cd backend && docker cp alembic backend_tests:/srv/ \
+ && docker exec backend_database psql -U northlanding -d northlanding_test -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' \
+ && docker exec backend_tests sh -c 'cd /srv && uv run alembic upgrade head && uv run alembic downgrade -1 && uv run alembic upgrade head'
+```
+Expected: no errors; `import_staging` table created, dropped, recreated. After validating, reset again so pytest owns a clean schema: `docker exec backend_database psql -U northlanding -d northlanding_test -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`
 
 - [ ] **Step 7: Commit**
 
