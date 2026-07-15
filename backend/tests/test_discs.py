@@ -319,6 +319,28 @@ async def test_list_discs_admin_sees_all(client, db):
     assert "items" in resp.json()
 
 
+async def test_list_discs_serializes_owner_with_null_phone(client, db):
+    """A disc whose owner has no phone number must still serialize (owner
+    phone_number is nullable), not 500."""
+    from app.repositories.owner import OwnerRepository
+    admin = await make_admin(db, name="AdminNP", email="adminnp@example.com", google_id="g-adminnp")
+    owner = await OwnerRepository(db).resolve_or_create(
+        first_name="Nolan", last_name="Phone", phone_number=None
+    )
+    repo = DiscRepository(db)
+    await repo.create(
+        manufacturer="Innova", name="Roc", colors=["Red"],
+        input_date=date.today(), owner_id=owner.id,
+    )
+    await db.commit()
+
+    resp = await client.get("/discs", headers=admin_headers(admin.id))
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    matched = [d for d in items if d["owner"] and d["owner"]["first_name"] == "Nolan"]
+    assert matched and matched[0]["owner"]["phone_number"] is None
+
+
 async def test_upload_photo(client, db):
     admin = await make_admin(db, name="Admin3", email="admin3@example.com", google_id="g-admin3")
     create_resp = await client.post(
