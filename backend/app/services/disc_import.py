@@ -189,3 +189,128 @@ async def apply_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSum
 
     await db.flush()
     return summary
+
+
+def row_to_dict(r: ParsedDiscRow) -> dict:
+    return {
+        "row_number": r.row_number,
+        "first_name": r.first_name,
+        "last_name": r.last_name,
+        "phone": r.phone,
+        "manufacturer": r.manufacturer,
+        "model": r.model,
+        "colors": r.colors,
+        "notes": r.notes,
+        "input_date": r.input_date.isoformat() if r.input_date else None,
+        "returned": r.returned,
+        "returned_date": r.returned_date.isoformat() if r.returned_date else None,
+        "error": r.error,
+    }
+
+
+def row_from_dict(d: dict) -> ParsedDiscRow:
+    return ParsedDiscRow(
+        row_number=d["row_number"],
+        first_name=d["first_name"],
+        last_name=d["last_name"],
+        phone=d["phone"],
+        manufacturer=d["manufacturer"],
+        model=d["model"],
+        colors=d["colors"],
+        notes=d["notes"],
+        input_date=date.fromisoformat(d["input_date"]) if d["input_date"] else None,
+        returned=d["returned"],
+        returned_date=date.fromisoformat(d["returned_date"]) if d["returned_date"] else None,
+        error=d["error"],
+    )
+
+
+def _owner_label_from_row(row: ParsedDiscRow) -> str | None:
+    name = f"{row.first_name} {row.last_name}".strip()
+    parts = [p for p in (name, row.phone) if p]
+    return " / ".join(parts) if parts else None
+
+
+def _owner_label(owner) -> str | None:
+    if owner is None:
+        return None
+    name = f"{owner.first_name} {owner.last_name}".strip()
+    parts = [p for p in (name, owner.phone_number) if p]
+    return " / ".join(parts) if parts else None
+
+
+def _disc_label(row: ParsedDiscRow) -> dict:
+    return {
+        "manufacturer": row.manufacturer,
+        "model": row.model,
+        "colors": row.colors,
+        "owner": _owner_label_from_row(row),
+    }
+
+
+def _plan_diffs(existing, row: ParsedDiscRow) -> list[dict]:
+    """Human-readable field changes for display. Semantic (does not use owner_id)."""
+    diffs: list[dict] = []
+    if (existing.notes or None) != (row.notes or None):
+        diffs.append({"field": "notes", "old": existing.notes, "new": row.notes})
+    if [c.strip().lower() for c in existing.colors] != [c.strip().lower() for c in row.colors]:
+        diffs.append({"field": "colors", "old": existing.colors, "new": row.colors})
+    row_has_owner = bool(row.phone or row.first_name or row.last_name)
+    old_owner = _owner_label(existing.owner)
+    new_owner = _owner_label_from_row(row)
+    if row_has_owner and old_owner != new_owner:
+        diffs.append({"field": "owner", "old": old_owner, "new": new_owner})
+    if row.returned and not existing.is_returned:
+        diffs.append({"field": "returned", "old": False, "new": True})
+    return diffs
+
+
+@dataclass
+class ImportPlan:
+    created: list[dict] = field(default_factory=list)
+    updated: list[dict] = field(default_factory=list)
+    unchanged: int = 0
+    errors: list[dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "created": self.created,
+            "updated": self.updated,
+            "unchanged": self.unchanged,
+            "errors": self.errors,
+            "counts": {
+                "created": len(self.created),
+                "updated": len(self.updated),
+                "unchanged": self.unchanged,
+                "errors": len(self.errors),
+            },
+        }
+
+
+async def plan_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportPlan:
+    """Read-only classification of what an import would do. No writes, no SMS."""
+    disc_repo = DiscRepository(db)
+    plan = ImportPlan()
+    for row in rows:
+        if row.error or row.input_date is None:
+            plan.errors.append(
+                {"row": row_to_dict(row), "reason": row.error or "no date found"}
+            )
+            continue
+        existing = await disc_repo.find_by_import_key(
+            input_date=row.input_date,
+            manufacturer=row.manufacturer,
+            name=row.model,
+            colors=row.colors,
+            phone=row.phone,
+        )
+        label = {"row_number": row.row_number, **_disc_label(row)}
+        if existing is None:
+            plan.created.append(label)
+        else:
+            diffs = _plan_diffs(existing, row)
+            if diffs:
+                plan.updated.append({**label, "diffs": diffs})
+            else:
+                plan.unchanged += 1
+    return plan
