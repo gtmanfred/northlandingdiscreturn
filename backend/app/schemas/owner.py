@@ -7,7 +7,7 @@ class OwnerOut(BaseModel):
     id: uuid.UUID
     first_name: str
     last_name: str
-    phone_number: str
+    phone_number: str | None = None
     heads_up_sent_at: datetime | None = None
     created_at: datetime
 
