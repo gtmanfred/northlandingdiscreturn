@@ -8,21 +8,22 @@ import {
 import { Button } from '@/components/ui/button'
 
 export type PlanDiff = { field: string; old: unknown; new: unknown }
-export type PlannedNew = {
+export type PlannedDisc = {
   row_number: number
   manufacturer: string
   model: string
   colors: string[]
   owner: string | null
 }
-export type PlannedUpdate = PlannedNew & { diffs: PlanDiff[] }
+export type PlannedNew = PlannedDisc & { will_notify: boolean; skip_reason: string | null }
+export type PlannedUpdate = PlannedDisc & { diffs: PlanDiff[] }
 export type PlanError = { row: Record<string, unknown>; reason: string }
 export type ImportPlan = {
   created: PlannedNew[]
   updated: PlannedUpdate[]
   unchanged: number
   errors: PlanError[]
-  counts: { created: number; updated: number; unchanged: number; errors: number }
+  counts: { created: number; updated: number; unchanged: number; errors: number; will_notify: number }
 }
 
 const fmt = (v: unknown): string =>
@@ -64,18 +65,46 @@ export function ImportPreviewDialog({
           <span className="rounded bg-muted px-2 py-1">{c.errors} error{c.errors === 1 ? '' : 's'}</span>
         </div>
 
-        {plan.created.length > 0 && (
-          <details className="mt-2">
-            <summary className="cursor-pointer font-medium">New discs ({plan.created.length})</summary>
-            <ul className="mt-1 space-y-1 text-sm">
-              {plan.created.map((d) => (
-                <li key={`c-${d.row_number}`}>
-                  {d.manufacturer} <span>{d.model}</span> [{d.colors.join(' ')}] {d.owner ? `— ${d.owner}` : ''}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
+        {plan.created.length > 0 && (() => {
+          const willText = plan.created.filter((d) => d.will_notify)
+          const noText = plan.created.filter((d) => !d.will_notify)
+          const line = (d: PlannedNew) => (
+            <>
+              {d.manufacturer} <span>{d.model}</span> [{d.colors.join(' ')}]{d.owner ? ` — ${d.owner}` : ''}
+            </>
+          )
+          return (
+            <>
+              {willText.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer font-medium">
+                    New — will text owner ({willText.length})
+                  </summary>
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {willText.map((d) => (
+                      <li key={`cw-${d.row_number}`}>{line(d)}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {noText.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer font-medium">
+                    New — no text ({noText.length})
+                  </summary>
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {noText.map((d) => (
+                      <li key={`cn-${d.row_number}`}>
+                        {line(d)}{' '}
+                        <span className="text-muted-foreground">({d.skip_reason})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )
+        })()}
 
         {plan.updated.length > 0 && (
           <details className="mt-2">
