@@ -109,6 +109,22 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
     return rows
 
 
+def _compute_updates(existing, row: "ParsedDiscRow", owner_id) -> dict:
+    """Fields that would change on an existing disc for this row. Empty dict = unchanged."""
+    updates: dict = {}
+    if (existing.notes or None) != (row.notes or None):
+        updates["notes"] = row.notes
+    if [c.strip().lower() for c in existing.colors] != [c.strip().lower() for c in row.colors]:
+        updates["colors"] = row.colors
+    if existing.owner_id != owner_id:
+        updates["owner_id"] = owner_id
+    # one-way return: only ever set returned, never clear
+    if row.returned and not existing.is_returned:
+        updates["is_returned"] = True
+        updates["returned_date"] = row.returned_date
+    return updates
+
+
 @dataclass
 class ImportSummary:
     created: int = 0
@@ -117,7 +133,7 @@ class ImportSummary:
     errors: list[dict] = field(default_factory=list)
 
 
-async def import_rows(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSummary:
+async def apply_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSummary:
     summary = ImportSummary()
     disc_repo = DiscRepository(db)
     owner_repo = OwnerRepository(db)
@@ -164,17 +180,7 @@ async def import_rows(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSumm
                     await maybe_enqueue_heads_up(owner=owner_obj, disc=disc, db=db)
             summary.created += 1
         else:
-            updates = {}
-            if (existing.notes or None) != (row.notes or None):
-                updates["notes"] = row.notes
-            if [c.strip().lower() for c in existing.colors] != [c.strip().lower() for c in row.colors]:
-                updates["colors"] = row.colors
-            if existing.owner_id != owner_id:
-                updates["owner_id"] = owner_id
-            # one-way return: only ever set returned, never clear
-            if row.returned and not existing.is_returned:
-                updates["is_returned"] = True
-                updates["returned_date"] = row.returned_date
+            updates = _compute_updates(existing, row, owner_id)
             if updates:
                 await disc_repo.update(existing, **updates)
                 summary.updated += 1

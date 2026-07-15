@@ -3,7 +3,7 @@ from datetime import date as _date
 import openpyxl
 import pytest
 from sqlalchemy import select
-from app.services.disc_import import parse_current_sheet, ParsedDiscRow, import_rows, ImportSummary
+from app.services.disc_import import parse_current_sheet, ParsedDiscRow, apply_import, ImportSummary
 from app.repositories.disc import DiscRepository
 from app.models.pickup_event import SMSJob
 
@@ -122,11 +122,11 @@ def _row(**kw):
 
 @pytest.mark.asyncio
 async def test_import_creates_then_updates(db):
-    s1 = await import_rows([_row()], db)
+    s1 = await apply_import([_row()], db)
     assert s1.created == 1 and s1.updated == 0
 
     # same key, changed notes -> update, not create
-    s2 = await import_rows([_row(notes="changed")], db)
+    s2 = await apply_import([_row(notes="changed")], db)
     assert s2.created == 0 and s2.updated == 1
 
     repo = DiscRepository(db)
@@ -137,22 +137,22 @@ async def test_import_creates_then_updates(db):
 
 @pytest.mark.asyncio
 async def test_import_returned_is_one_way(db):
-    await import_rows([_row()], db)
+    await apply_import([_row()], db)
     repo = DiscRepository(db)
     disc = (await repo.list_for_export())[0]
     # mark returned in-app
     await repo.update(disc, is_returned=True, returned_date=_date(2026, 6, 5))
     await db.flush()
     # re-import the row still showing active -> must NOT un-return
-    await import_rows([_row()], db)
+    await apply_import([_row()], db)
     disc = (await repo.list_for_export())[0]
     assert disc.is_returned is True
 
 
 @pytest.mark.asyncio
 async def test_import_marks_returned_from_sheet(db):
-    await import_rows([_row()], db)
-    await import_rows([_row(returned=True, returned_date=_date(2026, 6, 9))], db)
+    await apply_import([_row()], db)
+    await apply_import([_row(returned=True, returned_date=_date(2026, 6, 9))], db)
     repo = DiscRepository(db)
     disc = (await repo.list_for_export())[0]
     assert disc.is_returned is True
@@ -161,7 +161,7 @@ async def test_import_marks_returned_from_sheet(db):
 
 @pytest.mark.asyncio
 async def test_import_reports_row_errors(db):
-    summary = await import_rows([_row(error="missing or invalid Date found")], db)
+    summary = await apply_import([_row(error="missing or invalid Date found")], db)
     assert summary.created == 0
     assert len(summary.errors) == 1
     assert summary.errors[0]["row"] == 4
@@ -171,7 +171,7 @@ async def test_import_reports_row_errors(db):
 async def test_import_create_branch_already_returned(db):
     """Brand-new row whose sheet already shows returned=True must be created with is_returned set."""
     ret_date = _date(2026, 5, 20)
-    summary = await import_rows([_row(returned=True, returned_date=ret_date)], db)
+    summary = await apply_import([_row(returned=True, returned_date=ret_date)], db)
     assert summary.created == 1
 
     repo = DiscRepository(db)
@@ -187,7 +187,7 @@ async def test_import_create_branch_already_returned(db):
 @pytest.mark.asyncio
 async def test_import_create_enqueues_welcome_and_heads_up(db):
     """Created disc with phone+name enqueues exactly one welcome and one heads-up SMSJob."""
-    await import_rows([_row()], db)
+    await apply_import([_row()], db)
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 2
 
@@ -198,7 +198,7 @@ async def test_import_two_creates_same_owner_one_welcome_two_heads_up(db):
     row1 = _row(manufacturer="Innova", model="Teebird", colors=["white"])
     row2 = _row(manufacturer="Discraft", model="Buzzz", colors=["red"],
                 row_number=5, input_date=_date(2026, 6, 2))
-    await import_rows([row1, row2], db)
+    await apply_import([row1, row2], db)
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 3  # 1 welcome + 2 heads-up
 
@@ -206,11 +206,11 @@ async def test_import_two_creates_same_owner_one_welcome_two_heads_up(db):
 @pytest.mark.asyncio
 async def test_import_update_does_not_enqueue(db):
     """A row that matches an existing disc (update branch) → no new SMSJob."""
-    await import_rows([_row()], db)
+    await apply_import([_row()], db)
     # consume the jobs from first import by clearing them
     await db.execute(SMSJob.__table__.delete())
     # re-import with changed notes → update, not create
-    await import_rows([_row(notes="changed")], db)
+    await apply_import([_row(notes="changed")], db)
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 0
 
@@ -218,7 +218,7 @@ async def test_import_update_does_not_enqueue(db):
 @pytest.mark.asyncio
 async def test_import_created_returned_row_no_sms(db):
     """Created row that is already returned from the sheet → no SMSJob enqueued."""
-    await import_rows([_row(returned=True, returned_date=_date(2026, 5, 20))], db)
+    await apply_import([_row(returned=True, returned_date=_date(2026, 5, 20))], db)
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 0
 
@@ -226,7 +226,7 @@ async def test_import_created_returned_row_no_sms(db):
 @pytest.mark.asyncio
 async def test_import_create_no_phone_no_sms(db):
     """Created disc whose owner has a null phone → no SMSJob."""
-    await import_rows([_row(phone=None)], db)
+    await apply_import([_row(phone=None)], db)
     jobs = (await db.execute(select(SMSJob))).scalars().all()
     assert len(jobs) == 0
 
@@ -235,10 +235,10 @@ async def test_import_create_no_phone_no_sms(db):
 async def test_import_adds_phone_to_null_phone_disc_updates_not_creates(db):
     """Disc imported without a phone, re-imported with a phone → same disc gets
     the phone, no duplicate created."""
-    s1 = await import_rows([_row(phone=None)], db)
+    s1 = await apply_import([_row(phone=None)], db)
     assert s1.created == 1
 
-    s2 = await import_rows([_row(phone="+15551234567")], db)
+    s2 = await apply_import([_row(phone="+15551234567")], db)
     assert s2.created == 0 and s2.updated == 1
 
     repo = DiscRepository(db)

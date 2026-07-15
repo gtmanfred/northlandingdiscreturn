@@ -18,7 +18,7 @@ from app.services.welcome import maybe_enqueue_welcome
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
 from app.services.disc_export import build_current_sheet_workbook
-from app.services.disc_import import parse_current_sheet, import_rows
+from app.services.disc_import import parse_current_sheet, apply_import
 
 router = APIRouter()
 
@@ -162,7 +162,7 @@ async def import_discs(
         rows = parse_current_sheet(content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    summary = await import_rows(rows, db)
+    summary = await apply_import(rows, db)
     await db.commit()
     return {
         "created": summary.created,
