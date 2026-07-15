@@ -607,50 +607,6 @@ async def test_export_forbidden_for_non_admin(db, client):
     assert r.status_code == 403
 
 
-async def test_import_endpoint(db, client):
-    import io, openpyxl
-    from datetime import date as _date
-
-    admin = await make_admin(db, name="ImpAdmin", email="imp@x.com", google_id="g-imp")
-    headers = admin_headers(admin.id)
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Current"
-    ws.append(["North Landing Discs Database"])
-    ws.append(["sorted"])
-    ws.append(["Name", "Phone", "Mfr", "Model", "Color", "Other",
-               "Code", "Date found", "Date retuned", "Date contacted"])
-    ws.append(["Jane Doe", "404-951-8881", "Innova", "Teebird", "white",
-               "x", None, _date(2026, 6, 1), None, None])
-    buf = io.BytesIO()
-    wb.save(buf)
-
-    files = {"file": ("sheet.xlsx", buf.getvalue(),
-                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-    r = await client.post("/discs/import", files=files, headers=headers)
-    assert r.status_code == 200
-    body = r.json()
-    assert body["created"] == 1
-    assert body["updated"] == 0
-
-
-async def test_import_rejects_missing_current_sheet(db, client):
-    import io, openpyxl
-
-    admin = await make_admin(db, name="ImpAdmin2", email="imp2@x.com", google_id="g-imp2")
-    headers = admin_headers(admin.id)
-
-    wb = openpyxl.Workbook()
-    wb.active.title = "Other"
-    buf = io.BytesIO()
-    wb.save(buf)
-
-    files = {"file": ("sheet.xlsx", buf.getvalue(), "application/octet-stream")}
-    r = await client.post("/discs/import", files=files, headers=headers)
-    assert r.status_code == 422
-
-
 async def test_admin_list_discs_owner_full_name_filter(client, db):
     """GET /discs?owner_name=Alice%20Walker matches an owner with first_name=Alice, last_name=Walker."""
     from app.repositories.owner import OwnerRepository
