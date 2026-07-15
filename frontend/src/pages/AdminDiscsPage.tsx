@@ -10,6 +10,7 @@ import {
 } from '../api/northlanding'
 import { axiosInstance } from '@/api/client'
 import { PageHeader } from '../components/PageHeader'
+import { ImportPreviewDialog, type ImportPlan } from '../components/ImportPreviewDialog'
 import { LoadingState } from '../components/LoadingState'
 import { EmptyState } from '../components/EmptyState'
 import { StatusBadge, discStatus } from '../components/StatusBadge'
@@ -73,6 +74,8 @@ export function AdminDiscsPage() {
   const updateMutation = useUpdateDisc()
   const [error, setError] = useState('')
   const [importMsg, setImportMsg] = useState('')
+  const [preview, setPreview] = useState<{ stagingId: string; plan: ImportPlan; filename: string } | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
 
   const setTri = (setter: (v: boolean | undefined) => void) => (val: Tri) => {
     setter(val === 'all' ? undefined : val === 'true')
@@ -132,17 +135,46 @@ export function AdminDiscsPage() {
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    setImportMsg('')
     const form = new FormData()
     form.append('file', file)
     try {
-      const res = await axiosInstance.post('/discs/import', form)
+      const res = await axiosInstance.post('/discs/import/preview', form)
+      const data = res.data as { staging_id: string; plan: ImportPlan }
+      setPreview({ stagingId: data.staging_id, plan: data.plan, filename: file.name })
+    } catch {
+      setImportMsg('Preview failed. Check the file and try again.')
+    } finally {
+      e.target.value = ''
+    }
+  }
+
+  async function handleApproveImport() {
+    if (!preview) return
+    setImportBusy(true)
+    try {
+      const res = await axiosInstance.post(`/discs/import/${preview.stagingId}/apply`)
       const s = res.data as { created: number; updated: number; skipped: number; errors: unknown[] }
       setImportMsg(`Imported: ${s.created} new, ${s.updated} updated, ${s.skipped} unchanged, ${s.errors.length} errors`)
       await queryClient.invalidateQueries({ queryKey: getListDiscsQueryKey() })
+      setPreview(null)
     } catch {
-      setImportMsg('Import failed. Check the file and try again.')
+      setImportMsg('Import failed. Please try again.')
     } finally {
-      e.target.value = ''
+      setImportBusy(false)
+    }
+  }
+
+  async function handleCancelImport() {
+    if (!preview) return
+    setImportBusy(true)
+    try {
+      await axiosInstance.post(`/discs/import/${preview.stagingId}/cancel`)
+    } catch {
+      // best-effort discard; the staged row is superseded on next preview anyway
+    } finally {
+      setImportBusy(false)
+      setPreview(null)
     }
   }
 
@@ -183,6 +215,15 @@ export function AdminDiscsPage() {
             </Button>
           </>
         }
+      />
+
+      <ImportPreviewDialog
+        open={preview !== null}
+        filename={preview?.filename ?? ''}
+        plan={preview?.plan ?? null}
+        busy={importBusy}
+        onApprove={handleApproveImport}
+        onCancel={handleCancelImport}
       />
 
       <Card className="mb-4">

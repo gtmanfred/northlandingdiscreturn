@@ -18,7 +18,10 @@ from app.services.welcome import maybe_enqueue_welcome
 from app.config import settings
 from app.services.storage import upload_photo, delete_photo, storage_path_to_url
 from app.services.disc_export import build_current_sheet_workbook
-from app.services.disc_import import parse_current_sheet, import_rows
+from app.services.disc_import import (
+    parse_current_sheet, plan_import, apply_import, row_to_dict, row_from_dict,
+)
+from app.repositories.import_staging import ImportStagingRepository
 
 router = APIRouter()
 
@@ -151,9 +154,9 @@ async def export_discs(
     )
 
 
-@router.post("/import", operation_id="importDiscs")
-async def import_discs(
-    _: Annotated[User, Depends(require_admin)],
+@router.post("/import/preview", operation_id="previewImportDiscs")
+async def preview_import_discs(
+    user: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...),
 ):
@@ -162,7 +165,33 @@ async def import_discs(
         rows = parse_current_sheet(content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    summary = await import_rows(rows, db)
+    plan = await plan_import(rows, db)
+    repo = ImportStagingRepository(db)
+    staging = await repo.create_pending(
+        created_by=user.id,
+        filename=file.filename,
+        rows=[row_to_dict(r) for r in rows],
+        plan=plan.to_dict(),
+    )
+    await db.commit()
+    return {"staging_id": str(staging.id), "plan": plan.to_dict()}
+
+
+@router.post("/import/{staging_id}/apply", operation_id="applyImportDiscs")
+async def apply_import_discs(
+    staging_id: uuid.UUID,
+    user: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    repo = ImportStagingRepository(db)
+    staging = await repo.get(staging_id)
+    if staging is None:
+        raise HTTPException(status_code=404, detail="Import not found")
+    if staging.status != "pending":
+        raise HTTPException(status_code=409, detail="Import already resolved")
+    rows = [row_from_dict(d) for d in staging.rows]
+    summary = await apply_import(rows, db)
+    await repo.set_status(staging, "applied")
     await db.commit()
     return {
         "created": summary.created,
@@ -170,6 +199,23 @@ async def import_discs(
         "skipped": summary.skipped,
         "errors": summary.errors,
     }
+
+
+@router.post("/import/{staging_id}/cancel", operation_id="cancelImportDiscs")
+async def cancel_import_discs(
+    staging_id: uuid.UUID,
+    user: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    repo = ImportStagingRepository(db)
+    staging = await repo.get(staging_id)
+    if staging is None:
+        raise HTTPException(status_code=404, detail="Import not found")
+    if staging.status != "pending":
+        raise HTTPException(status_code=409, detail="Import already resolved")
+    await repo.set_status(staging, "canceled")
+    await db.commit()
+    return {"status": "canceled"}
 
 
 @router.patch("/{disc_id}", response_model=DiscOut, operation_id="updateDisc")

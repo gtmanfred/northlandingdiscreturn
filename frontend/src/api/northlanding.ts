@@ -43,7 +43,7 @@ export interface ApiKeyMeta {
   last_used_at?: ApiKeyMetaLastUsedAt;
 }
 
-export interface BodyImportDiscs {
+export interface BodyPreviewImportDiscs {
   file: Blob;
 }
 
@@ -151,13 +151,15 @@ export interface NotifyResult {
   discs_notified: number;
 }
 
+export type OwnerOutPhoneNumber = string | null;
+
 export type OwnerOutHeadsUpSentAt = string | null;
 
 export interface OwnerOut {
   id: string;
   first_name: string;
   last_name: string;
-  phone_number: string;
+  phone_number?: OwnerOutPhoneNumber;
   heads_up_sent_at?: OwnerOutHeadsUpSentAt;
   created_at: string;
   readonly name: string;
@@ -875,18 +877,18 @@ export function useExportDiscs<TData = Awaited<ReturnType<typeof exportDiscs>>, 
 
 
 /**
- * @summary Import Discs
+ * @summary Preview Import Discs
  */
-export const importDiscs = (
-    bodyImportDiscs: BodyImportDiscs,
+export const previewImportDiscs = (
+    bodyPreviewImportDiscs: BodyPreviewImportDiscs,
  signal?: AbortSignal
 ) => {
       
       const formData = new FormData();
-formData.append(`file`, bodyImportDiscs.file)
+formData.append(`file`, bodyPreviewImportDiscs.file)
 
       return customInstance<unknown>(
-      {url: `/discs/import`, method: 'POST',
+      {url: `/discs/import/preview`, method: 'POST',
       headers: {'Content-Type': 'multipart/form-data', },
        data: formData, signal
     },
@@ -895,11 +897,11 @@ formData.append(`file`, bodyImportDiscs.file)
   
 
 
-export const getImportDiscsMutationOptions = <TError = ErrorType<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importDiscs>>, TError,{data: BodyImportDiscs}, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof importDiscs>>, TError,{data: BodyImportDiscs}, TContext> => {
+export const getPreviewImportDiscsMutationOptions = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewImportDiscs>>, TError,{data: BodyPreviewImportDiscs}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof previewImportDiscs>>, TError,{data: BodyPreviewImportDiscs}, TContext> => {
 
-const mutationKey = ['importDiscs'];
+const mutationKey = ['previewImportDiscs'];
 const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -909,10 +911,10 @@ const {mutation: mutationOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importDiscs>>, {data: BodyImportDiscs}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewImportDiscs>>, {data: BodyPreviewImportDiscs}> = (props) => {
           const {data} = props ?? {};
 
-          return  importDiscs(data,)
+          return  previewImportDiscs(data,)
         }
 
         
@@ -920,23 +922,149 @@ const {mutation: mutationOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ImportDiscsMutationResult = NonNullable<Awaited<ReturnType<typeof importDiscs>>>
-    export type ImportDiscsMutationBody = BodyImportDiscs
-    export type ImportDiscsMutationError = ErrorType<HTTPValidationError>
+    export type PreviewImportDiscsMutationResult = NonNullable<Awaited<ReturnType<typeof previewImportDiscs>>>
+    export type PreviewImportDiscsMutationBody = BodyPreviewImportDiscs
+    export type PreviewImportDiscsMutationError = ErrorType<HTTPValidationError>
 
     /**
- * @summary Import Discs
+ * @summary Preview Import Discs
  */
-export const useImportDiscs = <TError = ErrorType<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importDiscs>>, TError,{data: BodyImportDiscs}, TContext>, }
+export const usePreviewImportDiscs = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewImportDiscs>>, TError,{data: BodyPreviewImportDiscs}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof importDiscs>>,
+        Awaited<ReturnType<typeof previewImportDiscs>>,
         TError,
-        {data: BodyImportDiscs},
+        {data: BodyPreviewImportDiscs},
         TContext
       > => {
 
-      const mutationOptions = getImportDiscsMutationOptions(options);
+      const mutationOptions = getPreviewImportDiscsMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * @summary Apply Import Discs
+ */
+export const applyImportDiscs = (
+    stagingId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<unknown>(
+      {url: `/discs/import/${stagingId}/apply`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getApplyImportDiscsMutationOptions = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyImportDiscs>>, TError,{stagingId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof applyImportDiscs>>, TError,{stagingId: string}, TContext> => {
+
+const mutationKey = ['applyImportDiscs'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyImportDiscs>>, {stagingId: string}> = (props) => {
+          const {stagingId} = props ?? {};
+
+          return  applyImportDiscs(stagingId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyImportDiscsMutationResult = NonNullable<Awaited<ReturnType<typeof applyImportDiscs>>>
+    
+    export type ApplyImportDiscsMutationError = ErrorType<HTTPValidationError>
+
+    /**
+ * @summary Apply Import Discs
+ */
+export const useApplyImportDiscs = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyImportDiscs>>, TError,{stagingId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof applyImportDiscs>>,
+        TError,
+        {stagingId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getApplyImportDiscsMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
+/**
+ * @summary Cancel Import Discs
+ */
+export const cancelImportDiscs = (
+    stagingId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<unknown>(
+      {url: `/discs/import/${stagingId}/cancel`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getCancelImportDiscsMutationOptions = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelImportDiscs>>, TError,{stagingId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof cancelImportDiscs>>, TError,{stagingId: string}, TContext> => {
+
+const mutationKey = ['cancelImportDiscs'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelImportDiscs>>, {stagingId: string}> = (props) => {
+          const {stagingId} = props ?? {};
+
+          return  cancelImportDiscs(stagingId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelImportDiscsMutationResult = NonNullable<Awaited<ReturnType<typeof cancelImportDiscs>>>
+    
+    export type CancelImportDiscsMutationError = ErrorType<HTTPValidationError>
+
+    /**
+ * @summary Cancel Import Discs
+ */
+export const useCancelImportDiscs = <TError = ErrorType<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelImportDiscs>>, TError,{stagingId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelImportDiscs>>,
+        TError,
+        {stagingId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getCancelImportDiscsMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }
