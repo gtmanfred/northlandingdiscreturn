@@ -3,6 +3,7 @@ from app.models.disc import Disc, DiscPhoto
 from app.models.pickup_event import PickupEvent, DiscPickupNotification, SMSJob, SMSJobStatus
 from app.models.owner import Owner
 from app.models.sms_opt_out import SMSOptOut
+from app.models.import_staging import ImportStaging
 
 __all__ = [
     "User", "PhoneNumber",
@@ -10,4 +11,5 @@ __all__ = [
     "PickupEvent", "DiscPickupNotification", "SMSJob", "SMSJobStatus",
     "Owner",
     "SMSOptOut",
+    "ImportStaging",
 ]
