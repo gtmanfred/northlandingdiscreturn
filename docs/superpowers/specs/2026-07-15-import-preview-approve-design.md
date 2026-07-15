@@ -99,6 +99,15 @@ breaks). All endpoints require admin.
 - **`POST /discs/import/{staging_id}/cancel`** — mark staging `canceled`
   (discard). Not found → 404; not `pending` → 409.
 
+**Authorization trade-off (accepted):** all three endpoints require admin but do
+NOT verify that `staging.created_by` equals the acting admin — any admin can
+apply or cancel another admin's staged import if they have its id. The staging
+id is server-side and only reachable via a direct API call (not the UI), and all
+admins already share full disc/owner CRUD and can trigger the same owner SMS via
+a normal import. Given that trusted-admin model, per-admin ownership scoping on
+apply/cancel is intentionally omitted (the `create_pending` cancel-prior logic is
+still scoped to the uploader, purely to bound stale rows).
+
 ## Frontend — AdminDiscsPage
 
 Selecting a file calls `preview` (not the old direct import). On success, open a
