@@ -60,7 +60,7 @@ class OwnerRepository:
         result = await self.db.execute(
             select(Owner.first_name)
             .where(Owner.first_name != "")
-            .distinct()
+            .group_by(Owner.first_name)
             .order_by(func.lower(Owner.first_name))
             .limit(limit)
         )
@@ -70,7 +70,7 @@ class OwnerRepository:
         result = await self.db.execute(
             select(Owner.last_name)
             .where(Owner.last_name != "")
-            .distinct()
+            .group_by(Owner.last_name)
             .order_by(func.lower(Owner.last_name))
             .limit(limit)
         )
