@@ -56,6 +56,27 @@ async def test_plan_classifies_unchanged(db):
     assert plan.to_dict()["counts"]["unchanged"] == 1
 
 
+async def test_plan_classifies_owner_removal_as_updated(db):
+    # Existing disc has an owner with a name but NO phone.
+    await apply_import(
+        [_row(first_name="Jane", last_name="Doe", phone=None)], db
+    )
+    # Re-imported row matches the same disc (find_by_import_key matches a
+    # blank phone against an owner with no phone) but has no name/phone at
+    # all, so apply_import would strip the owner. The plan must surface this
+    # as an update with an owner diff to None, not classify it unchanged.
+    plan = await plan_import(
+        [_row(first_name="", last_name="", phone=None)], db
+    )
+    d = plan.to_dict()
+    assert d["counts"]["updated"] == 1
+    assert d["counts"]["unchanged"] == 0
+    diff = d["updated"][0]["diffs"]
+    owner_diffs = [x for x in diff if x["field"] == "owner"]
+    assert len(owner_diffs) == 1
+    assert owner_diffs[0]["new"] is None
+
+
 async def test_plan_captures_error_rows_full_content(db):
     plan = await plan_import([_row(error="missing or invalid Date found", input_date=None)], db)
     d = plan.to_dict()

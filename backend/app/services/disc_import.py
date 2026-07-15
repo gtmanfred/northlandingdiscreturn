@@ -257,8 +257,8 @@ def _plan_diffs(existing, row: ParsedDiscRow) -> list[dict]:
         diffs.append({"field": "colors", "old": existing.colors, "new": row.colors})
     row_has_owner = bool(row.phone or row.first_name or row.last_name)
     old_owner = _owner_label(existing.owner)
-    new_owner = _owner_label_from_row(row)
-    if row_has_owner and old_owner != new_owner:
+    new_owner = _owner_label_from_row(row) if row_has_owner else None
+    if old_owner != new_owner:
         diffs.append({"field": "owner", "old": old_owner, "new": new_owner})
     if row.returned and not existing.is_returned:
         diffs.append({"field": "returned", "old": False, "new": True})
