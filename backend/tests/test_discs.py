@@ -70,6 +70,24 @@ async def test_delete_disc(db):
     assert found is None
 
 
+async def test_delete_disc_with_pickup_notification(db):
+    from datetime import datetime, timedelta, timezone
+    from app.models.pickup_event import PickupEvent, DiscPickupNotification
+
+    repo = DiscRepository(db)
+    disc = await repo.create(manufacturer="Prodigy", name="D2", colors=["Red"], input_date=date.today())
+    start = datetime.now(timezone.utc)
+    event = PickupEvent(start_at=start, end_at=start + timedelta(hours=1))
+    db.add(event)
+    await db.flush()
+    db.add(DiscPickupNotification(disc_id=disc.id, pickup_event_id=event.id))
+    await db.flush()
+
+    await repo.delete(disc.id)
+
+    assert await repo.get_by_id(disc.id) is None
+
+
 async def test_add_and_delete_photo(db):
     repo = DiscRepository(db)
     disc = await repo.create(manufacturer="Innova", name="Wraith", colors=["Blue"], input_date=date.today())
