@@ -38,7 +38,8 @@ class Disc(Base):
         order_by="DiscPhoto.sort_order",
     )
     pickup_notifications: Mapped[list["DiscPickupNotification"]] = relationship(
-        back_populates="disc"
+        back_populates="disc",
+        cascade="all, delete-orphan",
     )
 
 
