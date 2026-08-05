@@ -1,4 +1,5 @@
 import io
+import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 import openpyxl
@@ -11,6 +12,12 @@ from app.services.heads_up import maybe_enqueue_heads_up
 
 SHEET_NAME = "Current"
 HEADER_KEYWORD = "Name"
+
+ID_COLUMN_INDEX = 10   # 0-based index into a values_only row tuple: column K
+ID_COLUMN_NUMBER = 11  # 1-based openpyxl column number: column K
+INVALID_ID_ERROR = "invalid ID"
+FORMULA_ID_ERROR = "ID is a live formula — freeze with Paste Special > Values"
+DUPLICATE_ID_ERROR = "duplicate ID in sheet"
 
 
 @dataclass
@@ -26,6 +33,7 @@ class ParsedDiscRow:
     input_date: date | None
     returned: bool
     returned_date: date | None
+    disc_id: uuid.UUID | None = None
     error: str | None = None
 
 
@@ -47,12 +55,36 @@ def _as_date(value) -> date | None:
     return None
 
 
+def _cell(grid, row_index: int, col_index: int):
+    """Value at a 0-based grid position, or None when the row/column is short."""
+    if row_index < 0 or row_index >= len(grid):
+        return None
+    row = grid[row_index]
+    return row[col_index] if col_index < len(row) else None
+
+
+def _parse_disc_id(value, formula) -> tuple[uuid.UUID | None, str | None]:
+    """(disc_id, error) for one ID cell. `formula` is the un-evaluated cell content."""
+    if isinstance(formula, str) and formula.startswith("="):
+        return None, FORMULA_ID_ERROR
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        return None, None
+    try:
+        return uuid.UUID(text), None
+    except (ValueError, AttributeError, TypeError):
+        return None, INVALID_ID_ERROR
+
+
 def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     if SHEET_NAME not in wb.sheetnames:
         raise ValueError("Current sheet not found")
     ws = wb[SHEET_NAME]
     grid = list(ws.iter_rows(values_only=True))
+
+    formula_wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=False)
+    formula_grid = list(formula_wb[SHEET_NAME].iter_rows(values_only=True))
 
     header_idx = next(
         (i for i, r in enumerate(grid)
@@ -64,8 +96,12 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
 
     rows: list[ParsedDiscRow] = []
     for offset, r in enumerate(grid[header_idx + 1:], start=header_idx + 2):
-        cells = list(r) + [None] * (10 - len(r))
+        cells = list(r) + [None] * (11 - len(r))
         name, phone, mfr, model, color, other, code, found, returned_dt, _ = cells[:10]
+        disc_id, id_error = _parse_disc_id(
+            cells[ID_COLUMN_INDEX],
+            _cell(formula_grid, offset - 1, ID_COLUMN_INDEX),
+        )
 
         mfr = (str(mfr).strip() if mfr else "")
         model = (str(model).strip() if model else "")
@@ -88,8 +124,8 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
         if returned and ret_date is None:
             ret_date = input_date
 
-        error = None
-        if input_date is None:
+        error = id_error
+        if error is None and input_date is None:
             error = "missing or invalid Date found"
 
         rows.append(ParsedDiscRow(
@@ -104,8 +140,19 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
             input_date=input_date,
             returned=returned,
             returned_date=ret_date if returned else None,
+            disc_id=disc_id,
             error=error,
         ))
+
+    by_id: dict[uuid.UUID, list[ParsedDiscRow]] = {}
+    for row in rows:
+        if row.disc_id is not None:
+            by_id.setdefault(row.disc_id, []).append(row)
+    for group in by_id.values():
+        if len(group) > 1:
+            for row in group:
+                row.disc_id = None
+                row.error = DUPLICATE_ID_ERROR
     return rows
 
 
@@ -204,11 +251,13 @@ def row_to_dict(r: ParsedDiscRow) -> dict:
         "input_date": r.input_date.isoformat() if r.input_date else None,
         "returned": r.returned,
         "returned_date": r.returned_date.isoformat() if r.returned_date else None,
+        "disc_id": str(r.disc_id) if r.disc_id is not None else None,
         "error": r.error,
     }
 
 
 def row_from_dict(d: dict) -> ParsedDiscRow:
+    raw_id = d.get("disc_id")
     return ParsedDiscRow(
         row_number=d["row_number"],
         first_name=d["first_name"],
@@ -221,6 +270,7 @@ def row_from_dict(d: dict) -> ParsedDiscRow:
         input_date=date.fromisoformat(d["input_date"]) if d["input_date"] else None,
         returned=d["returned"],
         returned_date=date.fromisoformat(d["returned_date"]) if d["returned_date"] else None,
+        disc_id=uuid.UUID(raw_id) if raw_id else None,
         error=d["error"],
     )
 

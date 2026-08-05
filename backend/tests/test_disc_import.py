@@ -1,21 +1,28 @@
 import io
+import uuid
 from datetime import date as _date
 import openpyxl
 import pytest
 from sqlalchemy import select
-from app.services.disc_import import parse_current_sheet, ParsedDiscRow, apply_import, ImportSummary
+from app.services.disc_import import (
+    parse_current_sheet, ParsedDiscRow, apply_import, ImportSummary,
+    row_to_dict, row_from_dict,
+)
 from app.repositories.disc import DiscRepository
 from app.models.pickup_event import SMSJob
 
 
-def _make_sheet(data_rows):
+def _make_sheet(data_rows, *, id_header=True):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Current"
     ws.append(["North Landing Discs Database"])
     ws.append(["Sorted by ...", None, None, None, None, None, "Code: ..."])
-    ws.append(["Name", "Phone", "Mfr", "Model", "Color", "Other",
-               "Code", "Date found", "Date retuned", "Date contacted"])
+    header = ["Name", "Phone", "Mfr", "Model", "Color", "Other",
+              "Code", "Date found", "Date retuned", "Date contacted"]
+    if id_header:
+        header.append("ID")
+    ws.append(header)
     for r in data_rows:
         ws.append(r)
     buf = io.BytesIO()
@@ -108,6 +115,95 @@ def test_missing_current_sheet_raises():
     wb.save(buf)
     with pytest.raises(ValueError):
         parse_current_sheet(buf.getvalue())
+
+
+def test_parse_reads_disc_id_from_column_k():
+    known = uuid.uuid4()
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, str(known)],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id == known
+    assert row.error is None
+
+
+def test_parse_blank_id_is_none():
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, "   "],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id is None
+    assert row.error is None
+
+
+def test_parse_malformed_id_is_an_error():
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, "not-a-uuid"],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id is None
+    assert row.error == "invalid ID"
+
+
+def test_parse_live_formula_in_id_is_an_error():
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, "=L4"],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id is None
+    assert row.error == "ID is a live formula — freeze with Paste Special > Values"
+
+
+def test_parse_duplicate_id_errors_every_participating_row():
+    shared = str(uuid.uuid4())
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, shared],
+        ["Bob Roe", "404-951-8882", "Innova", "Roc", "blue", None, None,
+         _date(2026, 6, 7), None, None, shared],
+        ["Sue Poe", "404-951-8883", "Innova", "Leopard", "red", None, None,
+         _date(2026, 6, 8), None, None, str(uuid.uuid4())],
+    ])
+    rows = parse_current_sheet(data)
+    assert rows[0].error == "duplicate ID in sheet"
+    assert rows[1].error == "duplicate ID in sheet"
+    assert rows[2].error is None
+
+
+def test_parse_ignores_helper_column_l():
+    known = uuid.uuid4()
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, str(known), "=IF($K4<>\"\",$K4,\"x\")"],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id == known
+    assert row.error is None
+
+
+def test_row_dict_round_trip_carries_disc_id():
+    known = uuid.uuid4()
+    r = ParsedDiscRow(
+        row_number=4, first_name="Jane", last_name="Doe", phone="+15551234567",
+        manufacturer="Innova", model="Teebird", colors=["white"], notes=None,
+        input_date=_date(2026, 6, 1), returned=False, returned_date=None,
+        disc_id=known,
+    )
+    assert row_from_dict(row_to_dict(r)) == r
+
+
+def test_row_from_dict_tolerates_legacy_rows_without_disc_id():
+    legacy = {
+        "row_number": 4, "first_name": "Jane", "last_name": "Doe",
+        "phone": "+15551234567", "manufacturer": "Innova", "model": "Teebird",
+        "colors": ["white"], "notes": None, "input_date": "2026-06-01",
+        "returned": False, "returned_date": None, "error": None,
+    }
+    assert row_from_dict(legacy).disc_id is None
 
 
 def _row(**kw):
