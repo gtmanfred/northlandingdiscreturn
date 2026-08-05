@@ -185,6 +185,26 @@ def test_parse_ignores_helper_column_l():
     assert row.error is None
 
 
+def test_parse_live_formula_in_middle_row_does_not_shift_alignment():
+    first_uuid = uuid.uuid4()
+    third_uuid = uuid.uuid4()
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, str(first_uuid)],
+        ["Bob Roe", "404-951-8882", "Innova", "Roc", "blue", None, None,
+         _date(2026, 6, 7), None, None, "=L5"],
+        ["Sue Poe", "404-951-8883", "Innova", "Leopard", "red", None, None,
+         _date(2026, 6, 8), None, None, str(third_uuid)],
+    ])
+    rows = parse_current_sheet(data)
+    assert rows[0].disc_id == first_uuid
+    assert rows[0].error is None
+    assert rows[1].disc_id is None
+    assert rows[1].error == "ID is a live formula — freeze with Paste Special > Values"
+    assert rows[2].disc_id == third_uuid
+    assert rows[2].error is None
+
+
 def test_row_dict_round_trip_carries_disc_id():
     known = uuid.uuid4()
     r = ParsedDiscRow(
