@@ -19,6 +19,10 @@ INVALID_ID_ERROR = "invalid ID"
 FORMULA_ID_ERROR = "ID is a live formula — freeze with Paste Special > Values"
 DUPLICATE_ID_ERROR = "duplicate ID in sheet"
 
+ACTION_CREATE = "create"
+ACTION_CREATE_WITH_ID = "create_with_id"
+ACTION_UPDATE = "update"
+
 
 @dataclass
 class ParsedDiscRow:
@@ -172,6 +176,39 @@ def _compute_updates(existing, row: "ParsedDiscRow", owner_id) -> dict:
     return updates
 
 
+async def _resolve(row: ParsedDiscRow, disc_repo: DiscRepository):
+    """Decide what this row does. Returns (action, existing, drift).
+
+    An ID that names a live disc wins over any fuzzy match. An ID the database
+    does not know creates that exact id; `drift` then reports a fuzzy match, which
+    means the id probably changed under a row that already exists (an unfrozen
+    formula) rather than the row being genuinely new.
+    """
+    if row.disc_id is not None:
+        existing = await disc_repo.get_by_id(row.disc_id)
+        if existing is not None:
+            return ACTION_UPDATE, existing, None
+        drift = await disc_repo.find_by_import_key(
+            input_date=row.input_date,
+            manufacturer=row.manufacturer,
+            name=row.model,
+            colors=row.colors,
+            phone=row.phone,
+        )
+        return ACTION_CREATE_WITH_ID, None, drift
+
+    existing = await disc_repo.find_by_import_key(
+        input_date=row.input_date,
+        manufacturer=row.manufacturer,
+        name=row.model,
+        colors=row.colors,
+        phone=row.phone,
+    )
+    if existing is not None:
+        return ACTION_UPDATE, existing, None
+    return ACTION_CREATE, None, None
+
+
 @dataclass
 class ImportSummary:
     created: int = 0
@@ -200,13 +237,7 @@ async def apply_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSum
             )
             owner_id = owner_obj.id
 
-        existing = await disc_repo.find_by_import_key(
-            input_date=row.input_date,
-            manufacturer=row.manufacturer,
-            name=row.model,
-            colors=row.colors,
-            phone=row.phone,
-        )
+        action, existing, _drift = await _resolve(row, disc_repo)
 
         if existing is None:
             disc = await disc_repo.create(
@@ -216,6 +247,7 @@ async def apply_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSum
                 input_date=row.input_date,
                 owner_id=owner_id,
                 notes=row.notes,
+                id=row.disc_id if action == ACTION_CREATE_WITH_ID else None,
             )
             if row.returned:
                 await disc_repo.update(

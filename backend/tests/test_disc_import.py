@@ -9,6 +9,7 @@ from app.services.disc_import import (
     row_to_dict, row_from_dict,
 )
 from app.repositories.disc import DiscRepository
+from app.models.disc import Disc
 from app.models.pickup_event import SMSJob
 
 
@@ -362,3 +363,83 @@ async def test_import_adds_phone_to_null_phone_disc_updates_not_creates(db):
     assert len(rows) == 1
     assert rows[0].owner is not None
     assert rows[0].owner.phone_number == "+15551234567"
+
+
+@pytest.mark.asyncio
+async def test_apply_creates_disc_with_the_sheet_id(db):
+    wanted = uuid.uuid4()
+    summary = await apply_import([_row(disc_id=wanted)], db)
+    assert summary.created == 1
+    disc = await DiscRepository(db).get_by_id(wanted)
+    assert disc is not None
+    assert disc.name == "Teebird"
+
+
+@pytest.mark.asyncio
+async def test_apply_updates_the_disc_named_by_the_id(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, notes="changed")], db)
+    assert summary.created == 0
+    assert summary.updated == 1
+    disc = await DiscRepository(db).get_by_id(wanted)
+    assert disc.notes == "changed"
+
+
+@pytest.mark.asyncio
+async def test_id_match_beats_a_conflicting_fuzzy_match(db):
+    """Row's fields match disc B, but its ID names disc A. A is updated, B is not."""
+    id_a = uuid.uuid4()
+    repo = DiscRepository(db)
+    disc_a = await repo.create(
+        manufacturer="Latitude 64", name="River", colors=["green"],
+        input_date=_date(2020, 1, 1), notes="a", id=id_a,
+    )
+    disc_b = await repo.create(
+        manufacturer="Innova", name="Teebird", colors=["white"],
+        input_date=_date(2026, 6, 1), notes="b",
+    )
+    summary = await apply_import([_row(disc_id=id_a, notes="from sheet")], db)
+    assert summary.updated == 1
+    assert summary.created == 0
+    assert (await repo.get_by_id(disc_a.id)).notes == "from sheet"
+    assert (await repo.get_by_id(disc_b.id)).notes == "b"
+
+
+@pytest.mark.asyncio
+async def test_changed_fields_still_update_when_the_id_is_stable(db):
+    """The whole point: edit a matched field and the disc updates instead of duplicating."""
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, colors=["red"])], db)
+    assert summary.created == 0
+    assert summary.updated == 1
+    discs = (await db.execute(select(Disc))).scalars().all()
+    assert len(discs) == 1
+    assert discs[0].colors == ["red"]
+
+
+@pytest.mark.asyncio
+async def test_blank_id_still_uses_the_fuzzy_key(db):
+    await apply_import([_row()], db)
+    summary = await apply_import([_row(notes="changed")], db)
+    assert summary.created == 0
+    assert summary.updated == 1
+
+
+@pytest.mark.asyncio
+async def test_reimport_of_a_known_id_sends_no_sms(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    before = len((await db.execute(select(SMSJob))).scalars().all())
+    await apply_import([_row(disc_id=wanted, notes="changed")], db)
+    after = len((await db.execute(select(SMSJob))).scalars().all())
+    assert after == before
+
+
+@pytest.mark.asyncio
+async def test_apply_skips_rows_with_id_errors(db):
+    summary = await apply_import([_row(disc_id=None, error="invalid ID")], db)
+    assert summary.created == 0
+    assert summary.errors == [{"row": 4, "reason": "invalid ID"}]
+    assert (await db.execute(select(Disc))).scalars().all() == []
