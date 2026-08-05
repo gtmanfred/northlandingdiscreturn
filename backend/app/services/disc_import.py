@@ -356,6 +356,13 @@ def _notify_status(row: ParsedDiscRow) -> tuple[bool, str | None]:
     return True, None
 
 
+def _duplicate_warning(drift) -> str | None:
+    """Set when a sheet-supplied ID is unknown but the row's fields match a live disc."""
+    if drift is None:
+        return None
+    return f"possible duplicate — new ID but matches existing disc {drift.id}"
+
+
 @dataclass
 class ImportPlan:
     created: list[dict] = field(default_factory=list)
@@ -375,6 +382,9 @@ class ImportPlan:
                 "unchanged": self.unchanged,
                 "errors": len(self.errors),
                 "will_notify": sum(1 for c in self.created if c["will_notify"]),
+                "possible_duplicates": sum(
+                    1 for c in self.created if c["duplicate_warning"]
+                ),
             },
         }
 
@@ -389,19 +399,16 @@ async def plan_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportPlan
                 {"row": row_to_dict(row), "reason": row.error or "no date found"}
             )
             continue
-        existing = await disc_repo.find_by_import_key(
-            input_date=row.input_date,
-            manufacturer=row.manufacturer,
-            name=row.model,
-            colors=row.colors,
-            phone=row.phone,
-        )
+        _action, existing, drift = await _resolve(row, disc_repo)
         label = {"row_number": row.row_number, **_disc_label(row)}
         if existing is None:
             will_notify, skip_reason = _notify_status(row)
-            plan.created.append(
-                {**label, "will_notify": will_notify, "skip_reason": skip_reason}
-            )
+            plan.created.append({
+                **label,
+                "will_notify": will_notify,
+                "skip_reason": skip_reason,
+                "duplicate_warning": _duplicate_warning(drift),
+            })
         else:
             diffs = _plan_diffs(existing, row)
             if diffs:
