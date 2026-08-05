@@ -3,7 +3,7 @@ from openpyxl import Workbook
 
 DISC_EXPORT_COLUMNS = [
     "Name", "Phone", "Mfr", "Model", "Color", "Other",
-    "Code", "Date found", "Date returned", "Date contacted",
+    "Code", "Date found", "Date returned", "Date contacted", "ID",
 ]
 
 TITLE = "North Landing Discs Database"

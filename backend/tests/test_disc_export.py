@@ -7,7 +7,7 @@ from app.services.disc_export import build_current_sheet_workbook, DISC_EXPORT_C
 def test_columns_order():
     assert DISC_EXPORT_COLUMNS == [
         "Name", "Phone", "Mfr", "Model", "Color", "Other",
-        "Code", "Date found", "Date returned", "Date contacted",
+        "Code", "Date found", "Date returned", "Date contacted", "ID",
     ]
 
 
@@ -17,6 +17,7 @@ def test_build_workbook_roundtrip():
         "Model": "Teebird", "Color": "white", "Other": "no prev",
         "Code": "", "Date found": date(2026, 6, 1),
         "Date returned": None, "Date contacted": date(2026, 6, 3),
+        "ID": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
     }]
     data = build_current_sheet_workbook(rows)
     wb = openpyxl.load_workbook(io.BytesIO(data))
@@ -29,3 +30,13 @@ def test_build_workbook_roundtrip():
     assert first["Date found"] == date(2026, 6, 1)
     assert first["Date returned"] is None
     assert first["Date contacted"] == date(2026, 6, 3)
+    assert first["ID"] == "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+
+
+def test_id_is_written_as_text_not_a_formula():
+    rows = [{"ID": "3f2504e0-4f89-41d3-9a0c-0305e82c3301"}]
+    data = build_current_sheet_workbook(rows)
+    ws = openpyxl.load_workbook(io.BytesIO(data), data_only=False).active
+    cell = ws.cell(row=3, column=11)
+    assert cell.value == "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+    assert not str(cell.value).startswith("=")

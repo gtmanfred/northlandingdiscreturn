@@ -141,6 +141,7 @@ async def export_discs(
             "Date found": d.input_date,
             "Date returned": d.returned_date,
             "Date contacted": contacted,
+            "ID": str(d.id),
         })
 
     data = build_current_sheet_workbook(rows)

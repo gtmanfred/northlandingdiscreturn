@@ -600,6 +600,25 @@ async def test_export_xlsx_admin_only(db, client):
     assert body["Other"] == "no prev"
 
 
+async def test_export_includes_disc_id_column(db, client):
+    import io, openpyxl
+
+    admin = await make_admin(db, name="IdAdmin", email="id@x.com", google_id="g-id")
+    disc = await DiscRepository(db).create(
+        manufacturer="Innova", name="Teebird", colors=["white"],
+        input_date=date(2026, 6, 1),
+    )
+    await db.flush()
+
+    r = await client.get("/discs/export", headers=admin_headers(admin.id))
+    assert r.status_code == 200
+    grid = list(openpyxl.load_workbook(io.BytesIO(r.content)).active.iter_rows(values_only=True))
+    header = list(grid[1])
+    assert header[10] == "ID"
+    ids = {dict(zip(header, row))["ID"] for row in grid[2:]}
+    assert str(disc.id) in ids
+
+
 async def test_export_forbidden_for_non_admin(db, client):
     user = await UserRepository(db).create(name="Plain", email="plain@x.com", google_id="g-plain")
     await db.flush()
