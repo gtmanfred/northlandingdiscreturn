@@ -15,7 +15,11 @@ export type PlannedDisc = {
   colors: string[]
   owner: string | null
 }
-export type PlannedNew = PlannedDisc & { will_notify: boolean; skip_reason: string | null }
+export type PlannedNew = PlannedDisc & {
+  will_notify: boolean
+  skip_reason: string | null
+  duplicate_warning: string | null
+}
 export type PlannedUpdate = PlannedDisc & { diffs: PlanDiff[] }
 export type PlanError = { row: Record<string, unknown>; reason: string }
 export type ImportPlan = {
@@ -23,7 +27,14 @@ export type ImportPlan = {
   updated: PlannedUpdate[]
   unchanged: number
   errors: PlanError[]
-  counts: { created: number; updated: number; unchanged: number; errors: number; will_notify: number }
+  counts: {
+    created: number
+    updated: number
+    unchanged: number
+    errors: number
+    will_notify: number
+    possible_duplicates: number
+  }
 }
 
 const fmt = (v: unknown): string =>
@@ -31,7 +42,7 @@ const fmt = (v: unknown): string =>
 
 const ERROR_COLS = [
   'row_number', 'first_name', 'last_name', 'phone', 'manufacturer',
-  'model', 'colors', 'notes', 'input_date', 'returned', 'returned_date',
+  'model', 'colors', 'notes', 'input_date', 'returned', 'returned_date', 'disc_id',
 ]
 
 export function ImportPreviewDialog({
@@ -63,6 +74,11 @@ export function ImportPreviewDialog({
           <span className="rounded bg-muted px-2 py-1">{c.updated} updated</span>
           <span className="rounded bg-muted px-2 py-1">{c.unchanged} unchanged</span>
           <span className="rounded bg-muted px-2 py-1">{c.errors} error{c.errors === 1 ? '' : 's'}</span>
+          {c.possible_duplicates > 0 && (
+            <span className="rounded bg-destructive/10 px-2 py-1 text-destructive">
+              {c.possible_duplicates} possible duplicate{c.possible_duplicates === 1 ? '' : 's'}
+            </span>
+          )}
         </div>
 
         {plan.created.length > 0 && (() => {
@@ -71,6 +87,9 @@ export function ImportPreviewDialog({
           const line = (d: PlannedNew) => (
             <>
               {d.manufacturer} <span>{d.model}</span> [{d.colors.join(' ')}]{d.owner ? ` — ${d.owner}` : ''}
+              {d.duplicate_warning && (
+                <span className="ml-1 text-destructive">⚠ {d.duplicate_warning}</span>
+              )}
             </>
           )
           return (
