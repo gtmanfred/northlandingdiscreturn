@@ -81,14 +81,19 @@ def _parse_disc_id(value, formula) -> tuple[uuid.UUID | None, str | None]:
 
 
 def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
-    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
     if SHEET_NAME not in wb.sheetnames:
+        wb.close()
         raise ValueError("Current sheet not found")
     ws = wb[SHEET_NAME]
     grid = list(ws.iter_rows(values_only=True))
+    wb.close()
 
-    formula_wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=False)
+    formula_wb = openpyxl.load_workbook(
+        io.BytesIO(file_bytes), data_only=False, read_only=True
+    )
     formula_grid = list(formula_wb[SHEET_NAME].iter_rows(values_only=True))
+    formula_wb.close()
 
     header_idx = next(
         (i for i, r in enumerate(grid)
