@@ -162,6 +162,27 @@ Populated `ID` cells are never modified, so re-running is safe. `openpyxl` rewri
 the workbook on save and does not preserve charts, images, or pivot tables — keep
 the backup.
 
+### Spreadsheet ID column
+
+The `Current` sheet's column `K` (`ID`) holds a stable uuid per disc; the import
+matches on it, so an edit to a disc's colors or phone updates that disc instead of
+creating a duplicate. Column `L` (`ID gen`) is the formula that generates new ids
+and is ignored by the app. `L4`, filled down past the last data row:
+
+```
+=IF($K4<>"",$K4,LOWER(DEC2HEX(RANDBETWEEN(0,4294967295),8)&"-"&DEC2HEX(RANDBETWEEN(0,65535),4)&"-4"&DEC2HEX(RANDBETWEEN(0,4095),3)&"-"&DEC2HEX(RANDBETWEEN(8,11),1)&DEC2HEX(RANDBETWEEN(0,4095),3)&"-"&DEC2HEX(RANDBETWEEN(0,65535),4)&DEC2HEX(RANDBETWEEN(0,4294967295),8)))
+```
+
+After adding rows, freeze the new ids before saving: select `L4` through the last
+data row, Copy, click `K4`, Paste Special > Values only. A live formula in `K`
+recalculates and its uuid changes on every save, which would duplicate discs on
+the next import.
+
+An **admin xlsx export** carries real ids in `K` but deliberately omits the `L`
+formula. If you keep working in a downloaded export, re-add the `L4` formula above
+(filled down) before adding new rows — otherwise those rows' `K` cells stay blank
+and fall back to the old fuzzy matching on import.
+
 ---
 
 ## Frontend Development
