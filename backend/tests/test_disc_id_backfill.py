@@ -5,7 +5,7 @@ from datetime import date as _date
 import openpyxl
 
 from app.repositories.disc import DiscRepository
-from app.services.disc_id_backfill import backfill_ids
+from app.services.disc_id_backfill import BackfillReport, backfill_ids, blocking_reason
 
 
 def _sheet(data_rows):
@@ -100,3 +100,20 @@ async def test_row_missing_a_date_still_gets_a_fresh_uuid(db):
     out, report = await backfill_ids(data, db)
     assert uuid.UUID(_ids(out)[4])
     assert report.generated == 1
+
+
+def test_blocking_reason_blocks_when_generated_exceeds_matched():
+    report = BackfillReport(matched=1, generated=2)
+    reason = blocking_reason(report)
+    assert reason is not None
+    assert "1" in reason
+    assert "2" in reason
+
+
+def test_blocking_reason_does_not_block_when_matched_meets_or_exceeds_generated():
+    assert blocking_reason(BackfillReport(matched=5, generated=5)) is None
+    assert blocking_reason(BackfillReport(matched=5, generated=2)) is None
+
+
+def test_blocking_reason_does_not_block_an_all_zero_report():
+    assert blocking_reason(BackfillReport(matched=0, generated=0)) is None

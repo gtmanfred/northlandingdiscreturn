@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
-from app.services.disc_id_backfill import backfill_ids  # noqa: E402
+from app.services.disc_id_backfill import backfill_ids, blocking_reason  # noqa: E402
 
 
 def normalize_database_url(url: str) -> str:
@@ -37,7 +37,9 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-async def run(*, xlsx_path: Path, output: Path, database_url: str, dry_run: bool) -> int:
+async def run(
+    *, xlsx_path: Path, output: Path, database_url: str, dry_run: bool, force: bool
+) -> int:
     engine = create_async_engine(normalize_database_url(database_url))
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
@@ -50,9 +52,19 @@ async def run(*, xlsx_path: Path, output: Path, database_url: str, dry_run: bool
         await engine.dispose()
 
     print(json.dumps(report.as_dict(), indent=2))
+
+    reason = blocking_reason(report)
+
     if dry_run:
+        if reason:
+            print(f"warning: {reason}", file=sys.stderr)
         print("(dry-run: spreadsheet not written)")
         return 0
+
+    if reason and not force:
+        print(f"error: {reason}", file=sys.stderr)
+        print("pass --force to write anyway", file=sys.stderr)
+        return 3
 
     output.write_bytes(data)
     print(f"wrote {output}")
@@ -68,6 +80,11 @@ def main() -> int:
         help="Postgres URL. Default: $DATABASE_URL.",
     )
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="Write even when generated > matched (see blocking_reason).",
+    )
     p.add_argument(
         "--output",
         type=Path,
@@ -91,6 +108,7 @@ def main() -> int:
             output=args.output or args.xlsx_path,
             database_url=args.database_url,
             dry_run=args.dry_run,
+            force=args.force,
         )
     )
 

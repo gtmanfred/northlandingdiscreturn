@@ -107,3 +107,22 @@ async def backfill_ids(
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue(), report
+
+
+def blocking_reason(report: BackfillReport) -> str | None:
+    """None when `report` looks safe to write, else a human-readable reason.
+
+    `generated > matched` means the fuzzy matcher failed on the majority of
+    unpopulated rows — the signature of a broad mismatch (edited fields, a
+    stale sheet) rather than a handful of genuinely-new discs. An all-zero
+    report (nothing to write) is a no-op, not a failure, and is never blocked.
+    """
+    if report.generated == 0 and report.matched == 0:
+        return None
+    if report.generated > report.matched:
+        return (
+            f"generated ({report.generated}) exceeds matched ({report.matched}): "
+            "the fuzzy matcher failed on most unpopulated rows, which usually "
+            "means edited fields or a stale sheet rather than genuinely-new discs"
+        )
+    return None
