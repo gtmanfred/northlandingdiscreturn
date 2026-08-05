@@ -624,3 +624,35 @@ async def test_admin_list_discs_owner_full_name_filter(client, db):
     names = [d["name"] for d in resp.json()["items"]]
     assert "WalkerDisc" in names
     assert "SmithDisc" not in names
+
+
+async def test_repo_create_accepts_explicit_id(db):
+    import uuid as _uuid
+    from datetime import date as _date
+    from app.repositories.disc import DiscRepository
+
+    wanted = _uuid.uuid4()
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova",
+        name="Teebird",
+        colors=["white"],
+        input_date=_date(2026, 6, 1),
+        id=wanted,
+    )
+    assert disc.id == wanted
+    assert (await repo.get_by_id(wanted)) is not None
+
+
+async def test_repo_create_without_id_generates_one(db):
+    from datetime import date as _date
+    from app.repositories.disc import DiscRepository
+
+    repo = DiscRepository(db)
+    disc = await repo.create(
+        manufacturer="Innova",
+        name="Roc",
+        colors=["blue"],
+        input_date=_date(2026, 6, 1),
+    )
+    assert disc.id is not None
