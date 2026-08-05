@@ -144,6 +144,26 @@ In production (Fly.io), migrations run automatically as part of each deploy via 
 
 ---
 
+## Scripts
+
+### Backfilling disc IDs
+
+One-off: stamp stable ids into the `Current` sheet's `ID` column (K), pulling real
+ids from the database where the row matches an existing disc.
+
+```bash
+cp discs.xlsx discs-backup.xlsx
+export DATABASE_URL='postgresql+asyncpg://user:pass@host:5432/dbname'
+uv run --project backend python scripts/backfill_disc_ids.py discs.xlsx --dry-run
+uv run --project backend python scripts/backfill_disc_ids.py discs.xlsx
+```
+
+Populated `ID` cells are never modified, so re-running is safe. `openpyxl` rewrites
+the workbook on save and does not preserve charts, images, or pivot tables — keep
+the backup.
+
+---
+
 ## Frontend Development
 
 The frontend API client (`frontend/src/api/northlanding.ts`) is generated from the OpenAPI schema. To regenerate after backend changes:
