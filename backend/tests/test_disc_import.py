@@ -1,21 +1,29 @@
 import io
+import uuid
 from datetime import date as _date
 import openpyxl
 import pytest
 from sqlalchemy import select
-from app.services.disc_import import parse_current_sheet, ParsedDiscRow, apply_import, ImportSummary
+from app.services.disc_import import (
+    parse_current_sheet, ParsedDiscRow, apply_import, ImportSummary,
+    row_to_dict, row_from_dict,
+)
 from app.repositories.disc import DiscRepository
+from app.models.disc import Disc
 from app.models.pickup_event import SMSJob
 
 
-def _make_sheet(data_rows):
+def _make_sheet(data_rows, *, id_header=True, subtitle="Sorted by ..."):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Current"
     ws.append(["North Landing Discs Database"])
-    ws.append(["Sorted by ...", None, None, None, None, None, "Code: ..."])
-    ws.append(["Name", "Phone", "Mfr", "Model", "Color", "Other",
-               "Code", "Date found", "Date retuned", "Date contacted"])
+    ws.append([subtitle, None, None, None, None, None, "Code: ..."])
+    header = ["Name", "Phone", "Mfr", "Model", "Color", "Other",
+              "Code", "Date found", "Date retuned", "Date contacted"]
+    if id_header:
+        header.append("ID")
+    ws.append(header)
     for r in data_rows:
         ws.append(r)
     buf = io.BytesIO()
@@ -41,6 +49,23 @@ def test_parse_basic_row():
     assert row.input_date == _date(2026, 6, 6)
     assert row.returned is False
     assert row.error is None
+
+
+def test_parse_subtitle_containing_name_does_not_steal_header_row():
+    data = _make_sheet(
+        [
+            ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple trans",
+             "Ed no prev", None, _date(2026, 6, 6), None, None],
+        ],
+        subtitle="Sorted by Name, Phone, Mfr, Model, Color",
+    )
+    rows = parse_current_sheet(data)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.manufacturer == "Discraft"
+    assert row.model == "Heat"
+    assert row.input_date == _date(2026, 6, 6)
+    assert all(r.manufacturer != "Mfr" for r in rows)
 
 
 def test_parse_returned_row_from_date():
@@ -108,6 +133,115 @@ def test_missing_current_sheet_raises():
     wb.save(buf)
     with pytest.raises(ValueError):
         parse_current_sheet(buf.getvalue())
+
+
+def test_parse_reads_disc_id_from_column_k():
+    known = uuid.uuid4()
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, str(known)],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id == known
+    assert row.error is None
+
+
+def test_parse_blank_id_is_none():
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, "   "],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id is None
+    assert row.error is None
+
+
+def test_parse_malformed_id_is_an_error():
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, "not-a-uuid"],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id is None
+    assert row.error == "invalid ID"
+
+
+def test_parse_live_formula_in_id_is_an_error():
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, "=L4"],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id is None
+    assert row.error == "ID is a live formula — freeze with Paste Special > Values"
+
+
+def test_parse_duplicate_id_errors_every_participating_row():
+    shared = str(uuid.uuid4())
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, shared],
+        ["Bob Roe", "404-951-8882", "Innova", "Roc", "blue", None, None,
+         _date(2026, 6, 7), None, None, shared],
+        ["Sue Poe", "404-951-8883", "Innova", "Leopard", "red", None, None,
+         _date(2026, 6, 8), None, None, str(uuid.uuid4())],
+    ])
+    rows = parse_current_sheet(data)
+    assert rows[0].error == "duplicate ID in sheet"
+    assert rows[1].error == "duplicate ID in sheet"
+    assert rows[2].error is None
+
+
+def test_parse_ignores_helper_column_l():
+    known = uuid.uuid4()
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, str(known), "=IF($K4<>\"\",$K4,\"x\")"],
+    ])
+    row = parse_current_sheet(data)[0]
+    assert row.disc_id == known
+    assert row.error is None
+
+
+def test_parse_live_formula_in_middle_row_does_not_shift_alignment():
+    first_uuid = uuid.uuid4()
+    third_uuid = uuid.uuid4()
+    data = _make_sheet([
+        ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple", None, None,
+         _date(2026, 6, 6), None, None, str(first_uuid)],
+        ["Bob Roe", "404-951-8882", "Innova", "Roc", "blue", None, None,
+         _date(2026, 6, 7), None, None, "=L5"],
+        ["Sue Poe", "404-951-8883", "Innova", "Leopard", "red", None, None,
+         _date(2026, 6, 8), None, None, str(third_uuid)],
+    ])
+    rows = parse_current_sheet(data)
+    assert rows[0].disc_id == first_uuid
+    assert rows[0].error is None
+    assert rows[1].disc_id is None
+    assert rows[1].error == "ID is a live formula — freeze with Paste Special > Values"
+    assert rows[2].disc_id == third_uuid
+    assert rows[2].error is None
+
+
+def test_row_dict_round_trip_carries_disc_id():
+    known = uuid.uuid4()
+    r = ParsedDiscRow(
+        row_number=4, first_name="Jane", last_name="Doe", phone="+15551234567",
+        manufacturer="Innova", model="Teebird", colors=["white"], notes=None,
+        input_date=_date(2026, 6, 1), returned=False, returned_date=None,
+        disc_id=known,
+    )
+    assert row_from_dict(row_to_dict(r)) == r
+
+
+def test_row_from_dict_tolerates_legacy_rows_without_disc_id():
+    legacy = {
+        "row_number": 4, "first_name": "Jane", "last_name": "Doe",
+        "phone": "+15551234567", "manufacturer": "Innova", "model": "Teebird",
+        "colors": ["white"], "notes": None, "input_date": "2026-06-01",
+        "returned": False, "returned_date": None, "error": None,
+    }
+    assert row_from_dict(legacy).disc_id is None
 
 
 def _row(**kw):
@@ -246,3 +380,83 @@ async def test_import_adds_phone_to_null_phone_disc_updates_not_creates(db):
     assert len(rows) == 1
     assert rows[0].owner is not None
     assert rows[0].owner.phone_number == "+15551234567"
+
+
+@pytest.mark.asyncio
+async def test_apply_creates_disc_with_the_sheet_id(db):
+    wanted = uuid.uuid4()
+    summary = await apply_import([_row(disc_id=wanted)], db)
+    assert summary.created == 1
+    disc = await DiscRepository(db).get_by_id(wanted)
+    assert disc is not None
+    assert disc.name == "Teebird"
+
+
+@pytest.mark.asyncio
+async def test_apply_updates_the_disc_named_by_the_id(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, notes="changed")], db)
+    assert summary.created == 0
+    assert summary.updated == 1
+    disc = await DiscRepository(db).get_by_id(wanted)
+    assert disc.notes == "changed"
+
+
+@pytest.mark.asyncio
+async def test_id_match_beats_a_conflicting_fuzzy_match(db):
+    """Row's fields match disc B, but its ID names disc A. A is updated, B is not."""
+    id_a = uuid.uuid4()
+    repo = DiscRepository(db)
+    disc_a = await repo.create(
+        manufacturer="Latitude 64", name="River", colors=["green"],
+        input_date=_date(2020, 1, 1), notes="a", id=id_a,
+    )
+    disc_b = await repo.create(
+        manufacturer="Innova", name="Teebird", colors=["white"],
+        input_date=_date(2026, 6, 1), notes="b",
+    )
+    summary = await apply_import([_row(disc_id=id_a, notes="from sheet")], db)
+    assert summary.updated == 1
+    assert summary.created == 0
+    assert (await repo.get_by_id(disc_a.id)).notes == "from sheet"
+    assert (await repo.get_by_id(disc_b.id)).notes == "b"
+
+
+@pytest.mark.asyncio
+async def test_changed_fields_still_update_when_the_id_is_stable(db):
+    """The whole point: edit a matched field and the disc updates instead of duplicating."""
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, colors=["red"])], db)
+    assert summary.created == 0
+    assert summary.updated == 1
+    discs = (await db.execute(select(Disc))).scalars().all()
+    assert len(discs) == 1
+    assert discs[0].colors == ["red"]
+
+
+@pytest.mark.asyncio
+async def test_blank_id_still_uses_the_fuzzy_key(db):
+    await apply_import([_row()], db)
+    summary = await apply_import([_row(notes="changed")], db)
+    assert summary.created == 0
+    assert summary.updated == 1
+
+
+@pytest.mark.asyncio
+async def test_reimport_of_a_known_id_sends_no_sms(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    before = len((await db.execute(select(SMSJob))).scalars().all())
+    await apply_import([_row(disc_id=wanted, notes="changed")], db)
+    after = len((await db.execute(select(SMSJob))).scalars().all())
+    assert after == before
+
+
+@pytest.mark.asyncio
+async def test_apply_skips_rows_with_id_errors(db):
+    summary = await apply_import([_row(disc_id=None, error="invalid ID")], db)
+    assert summary.created == 0
+    assert summary.errors == [{"row": 4, "reason": "invalid ID"}]
+    assert (await db.execute(select(Disc))).scalars().all() == []

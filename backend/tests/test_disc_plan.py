@@ -1,3 +1,4 @@
+import uuid
 from datetime import date as _date
 from sqlalchemy import select
 from app.services.disc_import import (
@@ -12,7 +13,8 @@ def _row(**kw):
     base = dict(
         row_number=4, first_name="Jane", last_name="Doe", phone="+15551234567",
         manufacturer="Innova", model="Teebird", colors=["white"], notes="x",
-        input_date=_date(2026, 6, 1), returned=False, returned_date=None, error=None,
+        input_date=_date(2026, 6, 1), returned=False, returned_date=None,
+        disc_id=None, error=None,
     )
     base.update(kw)
     return ParsedDiscRow(**base)
@@ -111,3 +113,54 @@ async def test_plan_created_no_phone_does_not_notify(db):
     item = plan.to_dict()["created"][0]
     assert item["will_notify"] is False
     assert item["skip_reason"] == "no phone"
+
+
+async def test_plan_created_entries_carry_no_warning_by_default(db):
+    plan = await plan_import([_row()], db)
+    d = plan.to_dict()
+    assert d["created"][0]["duplicate_warning"] is None
+    assert d["counts"]["possible_duplicates"] == 0
+
+
+async def test_plan_warns_when_a_new_id_matches_an_existing_disc(db):
+    """Unfrozen formula: same disc, brand-new id. Flag it before it duplicates."""
+    await apply_import([_row()], db)
+    existing = (await db.execute(select(Disc))).scalars().one()
+    plan = await plan_import([_row(disc_id=uuid.uuid4())], db)
+    d = plan.to_dict()
+    assert d["counts"]["created"] == 1
+    assert d["counts"]["possible_duplicates"] == 1
+    assert d["created"][0]["duplicate_warning"] == (
+        f"possible duplicate — new ID but matches existing disc {existing.id}"
+    )
+
+
+async def test_plan_classifies_an_id_match_as_updated(db):
+    known = uuid.uuid4()
+    await apply_import([_row(disc_id=known)], db)
+    plan = await plan_import([_row(disc_id=known, notes="changed")], db)
+    d = plan.to_dict()
+    assert d["counts"]["updated"] == 1
+    assert d["counts"]["created"] == 0
+    assert d["updated"][0]["diffs"] == [{"field": "notes", "old": "x", "new": "changed"}]
+
+
+async def test_plan_unknown_id_with_no_fuzzy_match_is_a_clean_create(db):
+    plan = await plan_import([_row(disc_id=uuid.uuid4())], db)
+    d = plan.to_dict()
+    assert d["counts"]["created"] == 1
+    assert d["counts"]["possible_duplicates"] == 0
+
+
+async def test_plan_matches_apply_for_id_rows(db):
+    """Preview and apply must never disagree."""
+    known = uuid.uuid4()
+    rows = [_row(disc_id=known)]
+    first_plan = (await plan_import(rows, db)).to_dict()
+    first_apply = await apply_import(rows, db)
+    assert first_plan["counts"]["created"] == first_apply.created
+
+    rows2 = [_row(disc_id=known, notes="changed")]
+    second_plan = (await plan_import(rows2, db)).to_dict()
+    second_apply = await apply_import(rows2, db)
+    assert second_plan["counts"]["updated"] == second_apply.updated

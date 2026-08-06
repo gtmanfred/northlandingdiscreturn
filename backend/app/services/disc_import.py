@@ -1,4 +1,5 @@
 import io
+import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 import openpyxl
@@ -10,7 +11,17 @@ from app.services.welcome import maybe_enqueue_welcome
 from app.services.heads_up import maybe_enqueue_heads_up
 
 SHEET_NAME = "Current"
-HEADER_KEYWORD = "Name"
+HEADER_COLUMN_A = "name"  # column A of the header row, stripped and lowercased
+
+ID_COLUMN_INDEX = 10   # 0-based index into a values_only row tuple: column K
+ID_COLUMN_NUMBER = 11  # 1-based openpyxl column number: column K
+INVALID_ID_ERROR = "invalid ID"
+FORMULA_ID_ERROR = "ID is a live formula — freeze with Paste Special > Values"
+DUPLICATE_ID_ERROR = "duplicate ID in sheet"
+
+ACTION_CREATE = "create"
+ACTION_CREATE_WITH_ID = "create_with_id"
+ACTION_UPDATE = "update"
 
 
 @dataclass
@@ -26,6 +37,7 @@ class ParsedDiscRow:
     input_date: date | None
     returned: bool
     returned_date: date | None
+    disc_id: uuid.UUID | None = None
     error: str | None = None
 
 
@@ -47,16 +59,45 @@ def _as_date(value) -> date | None:
     return None
 
 
+def _cell(grid, row_index: int, col_index: int):
+    """Value at a 0-based grid position, or None when the row/column is short."""
+    if row_index < 0 or row_index >= len(grid):
+        return None
+    row = grid[row_index]
+    return row[col_index] if col_index < len(row) else None
+
+
+def _parse_disc_id(value, formula) -> tuple[uuid.UUID | None, str | None]:
+    """(disc_id, error) for one ID cell. `formula` is the un-evaluated cell content."""
+    if isinstance(formula, str) and formula.startswith("="):
+        return None, FORMULA_ID_ERROR
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        return None, None
+    try:
+        return uuid.UUID(text), None
+    except (ValueError, AttributeError, TypeError):
+        return None, INVALID_ID_ERROR
+
+
 def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
-    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
     if SHEET_NAME not in wb.sheetnames:
+        wb.close()
         raise ValueError("Current sheet not found")
     ws = wb[SHEET_NAME]
     grid = list(ws.iter_rows(values_only=True))
+    wb.close()
+
+    formula_wb = openpyxl.load_workbook(
+        io.BytesIO(file_bytes), data_only=False, read_only=True
+    )
+    formula_grid = list(formula_wb[SHEET_NAME].iter_rows(values_only=True))
+    formula_wb.close()
 
     header_idx = next(
         (i for i, r in enumerate(grid)
-         if r and r[0] and HEADER_KEYWORD in str(r[0])),
+         if r and r[0] and str(r[0]).strip().lower() == HEADER_COLUMN_A),
         None,
     )
     if header_idx is None:
@@ -64,8 +105,12 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
 
     rows: list[ParsedDiscRow] = []
     for offset, r in enumerate(grid[header_idx + 1:], start=header_idx + 2):
-        cells = list(r) + [None] * (10 - len(r))
+        cells = list(r) + [None] * (11 - len(r))
         name, phone, mfr, model, color, other, code, found, returned_dt, _ = cells[:10]
+        disc_id, id_error = _parse_disc_id(
+            cells[ID_COLUMN_INDEX],
+            _cell(formula_grid, offset - 1, ID_COLUMN_INDEX),
+        )
 
         mfr = (str(mfr).strip() if mfr else "")
         model = (str(model).strip() if model else "")
@@ -88,8 +133,8 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
         if returned and ret_date is None:
             ret_date = input_date
 
-        error = None
-        if input_date is None:
+        error = id_error
+        if error is None and input_date is None:
             error = "missing or invalid Date found"
 
         rows.append(ParsedDiscRow(
@@ -104,8 +149,19 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
             input_date=input_date,
             returned=returned,
             returned_date=ret_date if returned else None,
+            disc_id=disc_id,
             error=error,
         ))
+
+    by_id: dict[uuid.UUID, list[ParsedDiscRow]] = {}
+    for row in rows:
+        if row.disc_id is not None:
+            by_id.setdefault(row.disc_id, []).append(row)
+    for group in by_id.values():
+        if len(group) > 1:
+            for row in group:
+                row.disc_id = None
+                row.error = DUPLICATE_ID_ERROR
     return rows
 
 
@@ -123,6 +179,39 @@ def _compute_updates(existing, row: "ParsedDiscRow", owner_id) -> dict:
         updates["is_returned"] = True
         updates["returned_date"] = row.returned_date
     return updates
+
+
+async def _resolve(row: ParsedDiscRow, disc_repo: DiscRepository):
+    """Decide what this row does. Returns (action, existing, drift).
+
+    An ID that names a live disc wins over any fuzzy match. An ID the database
+    does not know creates that exact id; `drift` then reports a fuzzy match, which
+    means the id probably changed under a row that already exists (an unfrozen
+    formula) rather than the row being genuinely new.
+    """
+    if row.disc_id is not None:
+        existing = await disc_repo.get_by_id(row.disc_id)
+        if existing is not None:
+            return ACTION_UPDATE, existing, None
+        drift = await disc_repo.find_by_import_key(
+            input_date=row.input_date,
+            manufacturer=row.manufacturer,
+            name=row.model,
+            colors=row.colors,
+            phone=row.phone,
+        )
+        return ACTION_CREATE_WITH_ID, None, drift
+
+    existing = await disc_repo.find_by_import_key(
+        input_date=row.input_date,
+        manufacturer=row.manufacturer,
+        name=row.model,
+        colors=row.colors,
+        phone=row.phone,
+    )
+    if existing is not None:
+        return ACTION_UPDATE, existing, None
+    return ACTION_CREATE, None, None
 
 
 @dataclass
@@ -153,13 +242,7 @@ async def apply_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSum
             )
             owner_id = owner_obj.id
 
-        existing = await disc_repo.find_by_import_key(
-            input_date=row.input_date,
-            manufacturer=row.manufacturer,
-            name=row.model,
-            colors=row.colors,
-            phone=row.phone,
-        )
+        action, existing, _drift = await _resolve(row, disc_repo)
 
         if existing is None:
             disc = await disc_repo.create(
@@ -169,6 +252,7 @@ async def apply_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportSum
                 input_date=row.input_date,
                 owner_id=owner_id,
                 notes=row.notes,
+                id=row.disc_id if action == ACTION_CREATE_WITH_ID else None,
             )
             if row.returned:
                 await disc_repo.update(
@@ -204,11 +288,13 @@ def row_to_dict(r: ParsedDiscRow) -> dict:
         "input_date": r.input_date.isoformat() if r.input_date else None,
         "returned": r.returned,
         "returned_date": r.returned_date.isoformat() if r.returned_date else None,
+        "disc_id": str(r.disc_id) if r.disc_id is not None else None,
         "error": r.error,
     }
 
 
 def row_from_dict(d: dict) -> ParsedDiscRow:
+    raw_id = d.get("disc_id")
     return ParsedDiscRow(
         row_number=d["row_number"],
         first_name=d["first_name"],
@@ -221,6 +307,7 @@ def row_from_dict(d: dict) -> ParsedDiscRow:
         input_date=date.fromisoformat(d["input_date"]) if d["input_date"] else None,
         returned=d["returned"],
         returned_date=date.fromisoformat(d["returned_date"]) if d["returned_date"] else None,
+        disc_id=uuid.UUID(raw_id) if raw_id else None,
         error=d["error"],
     )
 
@@ -274,6 +361,13 @@ def _notify_status(row: ParsedDiscRow) -> tuple[bool, str | None]:
     return True, None
 
 
+def _duplicate_warning(drift) -> str | None:
+    """Set when a sheet-supplied ID is unknown but the row's fields match a live disc."""
+    if drift is None:
+        return None
+    return f"possible duplicate — new ID but matches existing disc {drift.id}"
+
+
 @dataclass
 class ImportPlan:
     created: list[dict] = field(default_factory=list)
@@ -293,6 +387,9 @@ class ImportPlan:
                 "unchanged": self.unchanged,
                 "errors": len(self.errors),
                 "will_notify": sum(1 for c in self.created if c["will_notify"]),
+                "possible_duplicates": sum(
+                    1 for c in self.created if c["duplicate_warning"]
+                ),
             },
         }
 
@@ -307,19 +404,16 @@ async def plan_import(rows: list[ParsedDiscRow], db: AsyncSession) -> ImportPlan
                 {"row": row_to_dict(row), "reason": row.error or "no date found"}
             )
             continue
-        existing = await disc_repo.find_by_import_key(
-            input_date=row.input_date,
-            manufacturer=row.manufacturer,
-            name=row.model,
-            colors=row.colors,
-            phone=row.phone,
-        )
+        _action, existing, drift = await _resolve(row, disc_repo)
         label = {"row_number": row.row_number, **_disc_label(row)}
         if existing is None:
             will_notify, skip_reason = _notify_status(row)
-            plan.created.append(
-                {**label, "will_notify": will_notify, "skip_reason": skip_reason}
-            )
+            plan.created.append({
+                **label,
+                "will_notify": will_notify,
+                "skip_reason": skip_reason,
+                "duplicate_warning": _duplicate_warning(drift),
+            })
         else:
             diffs = _plan_diffs(existing, row)
             if diffs:

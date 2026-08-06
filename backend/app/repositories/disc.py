@@ -22,7 +22,9 @@ class DiscRepository:
         is_clear: bool = False,
         is_found: bool = True,
         notes: str | None = None,
+        id: uuid.UUID | None = None,
     ) -> Disc:
+        kwargs = {} if id is None else {"id": id}
         disc = Disc(
             manufacturer=manufacturer,
             name=name,
@@ -32,6 +34,7 @@ class DiscRepository:
             is_clear=is_clear,
             is_found=is_found,
             notes=notes,
+            **kwargs,
         )
         self.db.add(disc)
         await self.db.flush()
