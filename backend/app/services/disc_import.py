@@ -11,7 +11,7 @@ from app.services.welcome import maybe_enqueue_welcome
 from app.services.heads_up import maybe_enqueue_heads_up
 
 SHEET_NAME = "Current"
-HEADER_KEYWORD = "Name"
+HEADER_COLUMN_A = "name"  # column A of the header row, stripped and lowercased
 
 ID_COLUMN_INDEX = 10   # 0-based index into a values_only row tuple: column K
 ID_COLUMN_NUMBER = 11  # 1-based openpyxl column number: column K
@@ -97,7 +97,7 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
 
     header_idx = next(
         (i for i, r in enumerate(grid)
-         if r and r[0] and HEADER_KEYWORD in str(r[0])),
+         if r and r[0] and str(r[0]).strip().lower() == HEADER_COLUMN_A),
         None,
     )
     if header_idx is None:

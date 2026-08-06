@@ -13,12 +13,12 @@ from app.models.disc import Disc
 from app.models.pickup_event import SMSJob
 
 
-def _make_sheet(data_rows, *, id_header=True):
+def _make_sheet(data_rows, *, id_header=True, subtitle="Sorted by ..."):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Current"
     ws.append(["North Landing Discs Database"])
-    ws.append(["Sorted by ...", None, None, None, None, None, "Code: ..."])
+    ws.append([subtitle, None, None, None, None, None, "Code: ..."])
     header = ["Name", "Phone", "Mfr", "Model", "Color", "Other",
               "Code", "Date found", "Date retuned", "Date contacted"]
     if id_header:
@@ -49,6 +49,23 @@ def test_parse_basic_row():
     assert row.input_date == _date(2026, 6, 6)
     assert row.returned is False
     assert row.error is None
+
+
+def test_parse_subtitle_containing_name_does_not_steal_header_row():
+    data = _make_sheet(
+        [
+            ["Jane Doe", "404-951-8881", "Discraft", "Heat", "purple trans",
+             "Ed no prev", None, _date(2026, 6, 6), None, None],
+        ],
+        subtitle="Sorted by Name, Phone, Mfr, Model, Color",
+    )
+    rows = parse_current_sheet(data)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.manufacturer == "Discraft"
+    assert row.model == "Heat"
+    assert row.input_date == _date(2026, 6, 6)
+    assert all(r.manufacturer != "Mfr" for r in rows)
 
 
 def test_parse_returned_row_from_date():
