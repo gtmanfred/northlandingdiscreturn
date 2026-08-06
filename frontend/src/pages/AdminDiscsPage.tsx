@@ -331,6 +331,9 @@ export function AdminDiscsPage() {
                       {disc.notes && (
                         <p className="text-sm text-muted-foreground italic">{disc.notes}</p>
                       )}
+                      <p className="truncate font-mono text-xs text-muted-foreground" title={disc.id}>
+                        {disc.id}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -379,6 +382,7 @@ export function AdminDiscsPage() {
                     <TableHead>Found</TableHead>
                     <TableHead className="text-center">Returned</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>ID</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -425,6 +429,12 @@ export function AdminDiscsPage() {
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={discStatus(disc)} />
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[7rem] truncate font-mono text-xs text-muted-foreground"
+                        title={disc.id}
+                      >
+                        {disc.id}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         <Button asChild variant="ghost" size="sm">
