@@ -215,3 +215,46 @@ async def test_plan_ignores_a_blank_manufacturer(db):
     await apply_import([_row(disc_id=wanted)], db)
     plan = await plan_import([_row(disc_id=wanted, manufacturer="")], db)
     assert plan.to_dict()["counts"]["unchanged"] == 1
+
+
+async def test_plan_shows_a_disc_being_unreturned(db):
+    wanted = uuid.uuid4()
+    await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    plan = await plan_import([_row(disc_id=wanted)], db)
+    d = plan.to_dict()
+    assert d["counts"]["updated"] == 1
+    fields = {diff["field"]: diff for diff in d["updated"][0]["diffs"]}
+    assert fields["returned"]["old"] is True
+    assert fields["returned"]["new"] is False
+    json.dumps(d)
+
+
+async def test_plan_shows_a_corrected_returned_date(db):
+    wanted = uuid.uuid4()
+    await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    plan = await plan_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 9))], db
+    )
+    d = plan.to_dict()
+    assert d["counts"]["updated"] == 1
+    fields = {diff["field"]: diff for diff in d["updated"][0]["diffs"]}
+    assert fields["returned_date"]["old"] == "2026-06-05"
+    assert fields["returned_date"]["new"] == "2026-06-09"
+    json.dumps(d)
+
+
+async def test_plan_matches_apply_for_unreturning(db):
+    """Preview and apply must never disagree about re-opening a disc."""
+    wanted = uuid.uuid4()
+    await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    rows = [_row(disc_id=wanted)]
+    plan = (await plan_import(rows, db)).to_dict()
+    applied = await apply_import(rows, db)
+    assert plan["counts"]["updated"] == applied.updated
+    assert plan["counts"]["unchanged"] == applied.skipped
