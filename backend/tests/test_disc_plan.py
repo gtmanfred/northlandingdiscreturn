@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import date as _date
 from sqlalchemy import select
@@ -164,3 +165,53 @@ async def test_plan_matches_apply_for_id_rows(db):
     second_plan = (await plan_import(rows2, db)).to_dict()
     second_apply = await apply_import(rows2, db)
     assert second_plan["counts"]["updated"] == second_apply.updated
+
+
+async def test_plan_shows_manufacturer_and_model_diffs(db):
+    wanted = uuid.uuid4()
+    await DiscRepository(db).create(
+        manufacturer="Axiom", name="Proxy", colors=["white"],
+        input_date=_date(2026, 6, 1), notes="x", id=wanted,
+    )
+    plan = await plan_import(
+        [_row(disc_id=wanted, manufacturer="Discraft", model="Zone")], db
+    )
+    d = plan.to_dict()
+    assert d["counts"]["updated"] == 1
+    assert d["counts"]["unchanged"] == 0
+    fields = {diff["field"]: diff for diff in d["updated"][0]["diffs"]}
+    assert fields["manufacturer"]["old"] == "Axiom"
+    assert fields["manufacturer"]["new"] == "Discraft"
+    assert fields["model"]["old"] == "Proxy"
+    assert fields["model"]["new"] == "Zone"
+
+
+async def test_plan_shows_input_date_diff(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    plan = await plan_import([_row(disc_id=wanted, input_date=_date(2026, 7, 4))], db)
+    d = plan.to_dict()
+    assert d["counts"]["updated"] == 1
+    fields = {diff["field"]: diff for diff in d["updated"][0]["diffs"]}
+    assert fields["input_date"]["old"] == "2026-06-01"
+    assert fields["input_date"]["new"] == "2026-07-04"
+
+
+async def test_plan_is_json_serializable(db):
+    """The plan is persisted into a JSONB column, so every diff value must be JSON-safe."""
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    plan = await plan_import(
+        [_row(disc_id=wanted, manufacturer="Discraft", model="Zone",
+              colors=["red"], notes="y", input_date=_date(2026, 7, 4))],
+        db,
+    )
+    assert plan.to_dict()["counts"]["updated"] == 1
+    json.dumps(plan.to_dict())  # raises TypeError on a raw date
+
+
+async def test_plan_ignores_a_blank_manufacturer(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    plan = await plan_import([_row(disc_id=wanted, manufacturer="")], db)
+    assert plan.to_dict()["counts"]["unchanged"] == 1
