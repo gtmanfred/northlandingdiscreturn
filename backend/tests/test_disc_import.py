@@ -460,3 +460,73 @@ async def test_apply_skips_rows_with_id_errors(db):
     assert summary.created == 0
     assert summary.errors == [{"row": 4, "reason": "invalid ID"}]
     assert (await db.execute(select(Disc))).scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_id_match_updates_manufacturer_and_model(db):
+    """A corrected Mfr/Model on an ID-stamped row rewrites the disc it names."""
+    wanted = uuid.uuid4()
+    repo = DiscRepository(db)
+    await repo.create(
+        manufacturer="Axiom", name="Proxy", colors=["white"],
+        input_date=_date(2026, 6, 1), notes="x", id=wanted,
+    )
+    summary = await apply_import(
+        [_row(disc_id=wanted, manufacturer="Discraft", model="Zone")], db
+    )
+    assert summary.updated == 1
+    assert summary.created == 0
+    discs = (await db.execute(select(Disc))).scalars().all()
+    assert len(discs) == 1
+    assert discs[0].manufacturer == "Discraft"
+    assert discs[0].name == "Zone"
+
+
+@pytest.mark.asyncio
+async def test_id_match_updates_input_date(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import(
+        [_row(disc_id=wanted, input_date=_date(2026, 7, 4))], db
+    )
+    assert summary.updated == 1
+    assert (await DiscRepository(db).get_by_id(wanted)).input_date == _date(2026, 7, 4)
+
+
+@pytest.mark.asyncio
+async def test_blank_manufacturer_does_not_blank_an_existing_disc(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, manufacturer="")], db)
+    assert summary.updated == 0
+    assert summary.skipped == 1
+    assert (await DiscRepository(db).get_by_id(wanted)).manufacturer == "Innova"
+
+
+@pytest.mark.asyncio
+async def test_blank_model_does_not_blank_an_existing_disc(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, model="")], db)
+    assert summary.updated == 0
+    assert summary.skipped == 1
+    assert (await DiscRepository(db).get_by_id(wanted)).name == "Teebird"
+
+
+@pytest.mark.asyncio
+async def test_manufacturer_only_change_counts_as_an_update_not_unchanged(db):
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted, manufacturer="Discraft")], db)
+    assert summary.updated == 1
+    assert summary.skipped == 0
+
+
+@pytest.mark.asyncio
+async def test_reimport_of_an_unchanged_row_stays_unchanged(db):
+    """The new field comparisons must not make every import rewrite every disc."""
+    wanted = uuid.uuid4()
+    await apply_import([_row(disc_id=wanted)], db)
+    summary = await apply_import([_row(disc_id=wanted)], db)
+    assert summary.updated == 0
+    assert summary.skipped == 1

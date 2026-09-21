@@ -165,9 +165,29 @@ def parse_current_sheet(file_bytes: bytes) -> list[ParsedDiscRow]:
     return rows
 
 
+def _corrected(existing_value, new_value) -> str | None:
+    """New text for a required field the sheet owns, or None to leave it alone.
+
+    A blank cell is a gap in the sheet, not an instruction to erase the record:
+    manufacturer and name are NOT NULL and the sheet is the only copy.
+    """
+    text = (new_value or "").strip()
+    if not text or text == (existing_value or "").strip():
+        return None
+    return text
+
+
 def _compute_updates(existing, row: "ParsedDiscRow", owner_id) -> dict:
     """Fields that would change on an existing disc for this row. Empty dict = unchanged."""
     updates: dict = {}
+    manufacturer = _corrected(existing.manufacturer, row.manufacturer)
+    if manufacturer is not None:
+        updates["manufacturer"] = manufacturer
+    model = _corrected(existing.name, row.model)
+    if model is not None:
+        updates["name"] = model
+    if row.input_date is not None and existing.input_date != row.input_date:
+        updates["input_date"] = row.input_date
     if (existing.notes or None) != (row.notes or None):
         updates["notes"] = row.notes
     if [c.strip().lower() for c in existing.colors] != [c.strip().lower() for c in row.colors]:
@@ -338,6 +358,21 @@ def _disc_label(row: ParsedDiscRow) -> dict:
 def _plan_diffs(existing, row: ParsedDiscRow) -> list[dict]:
     """Human-readable field changes for display. Semantic (does not use owner_id)."""
     diffs: list[dict] = []
+    manufacturer = _corrected(existing.manufacturer, row.manufacturer)
+    if manufacturer is not None:
+        diffs.append({
+            "field": "manufacturer", "old": existing.manufacturer, "new": manufacturer
+        })
+    model = _corrected(existing.name, row.model)
+    if model is not None:
+        diffs.append({"field": "model", "old": existing.name, "new": model})
+    if row.input_date is not None and existing.input_date != row.input_date:
+        # isoformat: the plan is persisted into a JSONB column
+        diffs.append({
+            "field": "input_date",
+            "old": existing.input_date.isoformat() if existing.input_date else None,
+            "new": row.input_date.isoformat(),
+        })
     if (existing.notes or None) != (row.notes or None):
         diffs.append({"field": "notes", "old": existing.notes, "new": row.notes})
     if [c.strip().lower() for c in existing.colors] != [c.strip().lower() for c in row.colors]:
