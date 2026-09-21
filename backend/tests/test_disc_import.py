@@ -270,17 +270,20 @@ async def test_import_creates_then_updates(db):
 
 
 @pytest.mark.asyncio
-async def test_import_returned_is_one_way(db):
+async def test_import_unreturns_when_the_sheet_returned_cell_is_blank(db):
+    """The sheet is the record of truth: a blank Date returned re-opens the disc."""
     await apply_import([_row()], db)
     repo = DiscRepository(db)
     disc = (await repo.list_for_export())[0]
     # mark returned in-app
     await repo.update(disc, is_returned=True, returned_date=_date(2026, 6, 5))
     await db.flush()
-    # re-import the row still showing active -> must NOT un-return
-    await apply_import([_row()], db)
+    # re-import the row still showing active -> the sheet wins, the disc re-opens
+    summary = await apply_import([_row()], db)
+    assert summary.updated == 1
     disc = (await repo.list_for_export())[0]
-    assert disc.is_returned is True
+    assert disc.is_returned is False
+    assert disc.returned_date is None
 
 
 @pytest.mark.asyncio
@@ -530,3 +533,54 @@ async def test_reimport_of_an_unchanged_row_stays_unchanged(db):
     summary = await apply_import([_row(disc_id=wanted)], db)
     assert summary.updated == 0
     assert summary.skipped == 1
+
+
+@pytest.mark.asyncio
+async def test_id_match_unreturns_when_the_sheet_returned_cell_is_blank(db):
+    wanted = uuid.uuid4()
+    await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    summary = await apply_import([_row(disc_id=wanted)], db)
+    assert summary.updated == 1
+    disc = await DiscRepository(db).get_by_id(wanted)
+    assert disc.is_returned is False
+    assert disc.returned_date is None
+
+
+@pytest.mark.asyncio
+async def test_id_match_updates_a_corrected_returned_date(db):
+    wanted = uuid.uuid4()
+    await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    summary = await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 9))], db
+    )
+    assert summary.updated == 1
+    disc = await DiscRepository(db).get_by_id(wanted)
+    assert disc.is_returned is True
+    assert disc.returned_date == _date(2026, 6, 9)
+
+
+@pytest.mark.asyncio
+async def test_reimport_of_an_unchanged_returned_row_stays_unchanged(db):
+    wanted = uuid.uuid4()
+    row = _row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))
+    await apply_import([row], db)
+    summary = await apply_import([row], db)
+    assert summary.updated == 0
+    assert summary.skipped == 1
+
+
+@pytest.mark.asyncio
+async def test_unreturning_a_disc_sends_no_sms(db):
+    """Re-opening a disc is a correction, not a new find — it must not text anyone."""
+    wanted = uuid.uuid4()
+    await apply_import(
+        [_row(disc_id=wanted, returned=True, returned_date=_date(2026, 6, 5))], db
+    )
+    await db.execute(SMSJob.__table__.delete())
+    await apply_import([_row(disc_id=wanted)], db)
+    jobs = (await db.execute(select(SMSJob))).scalars().all()
+    assert len(jobs) == 0

@@ -194,10 +194,15 @@ def _compute_updates(existing, row: "ParsedDiscRow", owner_id) -> dict:
         updates["colors"] = row.colors
     if existing.owner_id != owner_id:
         updates["owner_id"] = owner_id
-    # one-way return: only ever set returned, never clear
-    if row.returned and not existing.is_returned:
-        updates["is_returned"] = True
-        updates["returned_date"] = row.returned_date
+    # the sheet owns return status both ways: a cleared Date returned re-opens
+    # the disc, so an in-app return that the sheet has not caught up to is undone
+    if row.returned:
+        if not existing.is_returned or existing.returned_date != row.returned_date:
+            updates["is_returned"] = True
+            updates["returned_date"] = row.returned_date
+    elif existing.is_returned:
+        updates["is_returned"] = False
+        updates["returned_date"] = None
     return updates
 
 
@@ -382,8 +387,16 @@ def _plan_diffs(existing, row: ParsedDiscRow) -> list[dict]:
     new_owner = _owner_label_from_row(row) if row_has_owner else None
     if old_owner != new_owner:
         diffs.append({"field": "owner", "old": old_owner, "new": new_owner})
-    if row.returned and not existing.is_returned:
-        diffs.append({"field": "returned", "old": False, "new": True})
+    if row.returned != existing.is_returned:
+        diffs.append({
+            "field": "returned", "old": existing.is_returned, "new": row.returned
+        })
+    elif row.returned and existing.returned_date != row.returned_date:
+        diffs.append({
+            "field": "returned_date",
+            "old": existing.returned_date.isoformat() if existing.returned_date else None,
+            "new": row.returned_date.isoformat() if row.returned_date else None,
+        })
     return diffs
 
 
