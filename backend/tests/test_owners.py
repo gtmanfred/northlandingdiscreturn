@@ -355,12 +355,17 @@ async def test_final_notice_wording(db):
         end_at=datetime(2026, 5, 1, 22, 0, tzinfo=timezone.utc),
         notes=None,
     )
+    prior_event = await PickupEventRepository(db).create_event(
+        start_at=datetime(2026, 4, 1, 20, 0, tzinfo=timezone.utc),
+        end_at=datetime(2026, 4, 1, 22, 0, tzinfo=timezone.utc),
+        notes=None,
+    )
     await db.commit()
 
-    # Stub FINAL_NOTICE_THRESHOLD - 1 prior notifications so next call triggers final.
+    # Stub FINAL_NOTICE_THRESHOLD - 1 prior notifications (on a past event) so next call triggers final.
     for i in range(FINAL_NOTICE_THRESHOLD - 1):
         await PickupEventRepository(db).create_disc_notification(
-            disc_id=disc.id, pickup_event_id=event.id, is_final_notice=False
+            disc_id=disc.id, pickup_event_id=prior_event.id, is_final_notice=False
         )
     await db.commit()
 
