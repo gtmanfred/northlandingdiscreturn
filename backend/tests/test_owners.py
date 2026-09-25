@@ -332,3 +332,46 @@ async def test_notification_message_collapses_colors_to_comma_string(db):
     job = (await db.execute(select(SMSJob))).scalars().one()
     # Ordered colors collapse to a comma-separated string in the SMS body.
     assert "Innova Wave (white, red, blue)" in job.message
+
+
+async def test_final_notice_wording(db):
+    from datetime import date, datetime, timezone
+    from app.repositories.owner import OwnerRepository
+    from app.repositories.disc import DiscRepository
+    from app.repositories.pickup_event import PickupEventRepository
+    from app.services.notification import enqueue_pickup_notifications, FINAL_NOTICE_THRESHOLD
+    from app.models.pickup_event import SMSJob, DiscPickupNotification
+    from sqlalchemy import select
+
+    owner = await OwnerRepository(db).resolve_or_create(
+        first_name="Test", last_name="Owner", phone_number="+15559001111"
+    )
+    disc = await DiscRepository(db).create(
+        manufacturer="Innova", name="Destroyer", colors=["red"],
+        input_date=date(2026, 4, 1), owner_id=owner.id,
+    )
+    event = await PickupEventRepository(db).create_event(
+        start_at=datetime(2026, 5, 1, 20, 0, tzinfo=timezone.utc),
+        end_at=datetime(2026, 5, 1, 22, 0, tzinfo=timezone.utc),
+        notes=None,
+    )
+    await db.commit()
+
+    # Stub FINAL_NOTICE_THRESHOLD - 1 prior notifications so next call triggers final.
+    for i in range(FINAL_NOTICE_THRESHOLD - 1):
+        await PickupEventRepository(db).create_disc_notification(
+            disc_id=disc.id, pickup_event_id=event.id, is_final_notice=False
+        )
+    await db.commit()
+
+    # Trigger the final notice (6th notification).
+    await enqueue_pickup_notifications(event, db)
+    await db.commit()
+
+    job = (await db.execute(select(SMSJob))).scalars().one()
+    # Assert Roger's new formal wording is present.
+    assert "FINAL NOTICE:" in job.message
+    assert "considered unclaimed" in job.message
+    assert "within ten days" in job.message
+    assert "donate your disc(s) to the course" in job.message
+    assert "We sell donated and unclaimed discs and put the proceeds to the course" in job.message

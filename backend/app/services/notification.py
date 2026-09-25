@@ -54,11 +54,13 @@ async def enqueue_pickup_notifications(
         phone = owner_phone[owner_id]
         if owner_is_final.get(owner_id):
             message = (
-                f"FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the "
-                f"sale box if not picked up at the {window_str} pickup. "
-                "Register at https://discreturn.nl to view the discs you have to pick up. "
-                "Questions or comments? Email nldiscman@gmail.com. "
-                "Reply STOP to opt out."
+                f"FINAL NOTICE: Your disc(s) [{disc_list}] will be considered unclaimed if not "
+                f"picked up at the {window_str} pickup. Contact nldiscman@gmail.com within ten "
+                "days to arrange for a friend to pick up your disc(s) or to arrange a special "
+                "pickup or to donate your disc(s) to the course. We sell donated and unclaimed "
+                "discs and put the proceeds to the course. Register at https://discreturn.nl to "
+                "view the discs you have to pick up. Questions or comments? Email "
+                "nldiscman@gmail.com. Reply STOP to opt out."
             )
         else:
             message = (
