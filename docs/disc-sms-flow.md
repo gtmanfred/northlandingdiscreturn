@@ -196,9 +196,12 @@ Source: `backend/app/services/notification.py`
 
 Source: `backend/app/services/notification.py`
 
-> FINAL NOTICE: Your disc(s) [{disc_list}] will be added to the sale box if not picked
-> up at the {window_str} pickup. Register at https://discreturn.nl to view the discs you have to
-> pick up. Questions or comments? Email nldiscman@gmail.com. Reply STOP to opt out.
+> FINAL NOTICE: Your disc(s) [{disc_list}] will be considered unclaimed if not picked up at the
+> {window_str} pickup. Contact nldiscman@gmail.com within ten days to arrange for a friend to
+> pick up your disc(s) or to arrange a special pickup or to donate your disc(s) to the course.
+> We sell donated and unclaimed discs and put the proceeds to the course. Register at
+> https://discreturn.nl to view the discs you have to pick up. Questions or comments? Email
+> nldiscman@gmail.com. Reply STOP to opt out.
 
 ### Shared placeholders for Templates 2 & 3
 
